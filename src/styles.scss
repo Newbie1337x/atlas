@@ -1,0 +1,19 @@
+/* Ionic core + utilities (kept minimal — no design tokens yet, that's a
+   separate pass). Import order matters: core first, then structure/padding
+   utilities, then theming variables at the end so they can override.        */
+
+@import '@ionic/angular/css/core.css';
+@import '@ionic/angular/css/normalize.css';
+@import '@ionic/angular/css/structure.css';
+@import '@ionic/angular/css/typography.css';
+@import '@ionic/angular/css/display.css';
+
+/* Ionic utility helpers used by templates (ion-padding, etc.). */
+@import '@ionic/angular/css/padding.css';
+@import '@ionic/angular/css/float-elements.css';
+@import '@ionic/angular/css/text-alignment.css';
+@import '@ionic/angular/css/text-transformation.css';
+@import '@ionic/angular/css/flex-utils.css';
+
+/* Design tokens (colors / fonts / radii / spacing) intentionally not defined
+   yet — they land in a dedicated visual pass. Until then, Ionic's defaults win. */
