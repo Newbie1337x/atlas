@@ -27,7 +27,8 @@ import { AuthService } from '@core/auth/auth.service';
 
     <ion-content class="ion-padding">
       <p>Autenticado como: <strong>{{ user()?.email }}</strong></p>
-      <p>Rol: {{ user()?.role }}</p>
+      <p>Rol activo: {{ user()?.activeRole }}</p>
+      <p>Roles disponibles: {{ (user()?.roles ?? []).join(', ') }}</p>
       <p>Tenant: {{ user()?.organizationId }}</p>
       <p>Módulos: {{ (user()?.modules ?? []).join(', ') || '(ninguno)' }}</p>
 

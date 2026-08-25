@@ -1,5 +1,5 @@
 import { Injectable, computed, signal } from '@angular/core';
-import { CurrentUser } from './auth.tokens';
+import { CurrentUser, UserRole } from './auth.tokens';
 import { decodeJwt, JwtPayload } from './jwt.util';
 
 /**
@@ -29,12 +29,17 @@ export class SessionStore {
       this.clear();
       return false;
     }
+    // Normalize single-role JWT (today) OR multi-role JWT (future) to a stable
+    // array-shaped roles field. Consumers never care which shape backend sent.
+    const roles: UserRole[] = payload.roles?.length ? payload.roles : [payload.role];
+
     this._token.set(token);
     this._currentUser.set({
       email:          payload.sub,
       userId:         payload.userId,
       organizationId: payload.organizationId,
-      role:           payload.role,
+      roles,
+      activeRole:     roles[0],   // default active role — user toggles via setActiveRole
       modules:        payload.modules ?? [],
     });
     return true;
@@ -45,9 +50,24 @@ export class SessionStore {
     this._currentUser.set(null);
   }
 
+  /** Switch active role (for dual-role users like coach+customer). Noops if not in roles. */
+  setActiveRole(role: UserRole): void {
+    this._currentUser.update((u) => {
+      if (!u?.roles.includes(role)) return u;
+      return { ...u, activeRole: role };
+    });
+  }
+
+  /** True when the user has ANY of the given roles across ALL their granted roles. */
   hasRole(...roles: string[]): boolean {
-    const r = this._currentUser()?.role;
-    return !!r && roles.includes(r);
+    const granted = this._currentUser()?.roles ?? [];
+    return granted.some((r) => roles.includes(r));
+  }
+
+  /** True when the user's currently ACTIVE role matches any of the given. */
+  isActiveRole(...roles: string[]): boolean {
+    const active = this._currentUser()?.activeRole;
+    return !!active && roles.includes(active);
   }
 
   hasModule(module: string): boolean {

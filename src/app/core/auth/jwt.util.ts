@@ -1,11 +1,18 @@
 import { jwtDecode } from 'jwt-decode';
 
-/** JWT claims Proteus emits. `modules` is optional until backend bakes it in. */
+/**
+ * JWT claims Proteus emits. Notes:
+ * - Backend today emits SINGLE `role`. Frontend normalizes to array in SessionStore.
+ * - `roles` array is a planned backend addition (for dual-role users).
+ * - `modules` is emitted once backend bakes tenant capabilities into the token.
+ */
 export interface JwtPayload {
   sub: string;
   userId: number;
   organizationId: number;
   role: string;
+  /** Planned: multi-role support. Frontend already handles this shape. */
+  roles?: string[];
   exp: number;
   iat?: number;
   modules?: string[];

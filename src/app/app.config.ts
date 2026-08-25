@@ -15,7 +15,7 @@ import {
 
 import { routes } from './app.routes';
 import { environment } from '@env';
-import { API_BASE_URL, DEFAULT_TENANT_ID } from '@core/auth/auth.tokens';
+import { API_BASE_URL, DEFAULT_TENANT_SLUG } from '@core/auth/auth.tokens';
 import { authInterceptor } from '@core/auth/auth.interceptor';
 import { errorTransformInterceptor } from '@core/errors/error-transform.interceptor';
 import { GlobalErrorHandler } from '@core/errors/global-error.handler';
@@ -63,7 +63,7 @@ export const appConfig: ApplicationConfig = {
     provideTanStackQuery(queryClient),
 
     { provide: API_BASE_URL,      useValue: environment.apiUrl },
-    { provide: DEFAULT_TENANT_ID, useValue: environment.tenantId },
+    { provide: DEFAULT_TENANT_SLUG, useValue: environment.tenantSlug },
 
     { provide: ErrorHandler,      useClass: GlobalErrorHandler },
 

@@ -5,10 +5,18 @@
  */
 export const environment = {
   production: false,
+
+  /** Proteus API base URL. */
   apiUrl: 'http://localhost:8080',
-  /** Hardcoded single-tenant id. Read from JWT once you log in; this is only
-   *  used to allow anonymous requests (e.g. login itself) to identify the tenant. */
-  tenantId: '1',
+
+  /**
+   * Tenant slug used in the `X-Tenant-Slug` header on every /api/* request.
+   * TODO: replace `'default'` with your actual gym slug from Proteus. Find it via:
+   *   - Proteus admin panel → Organizations
+   *   - or: `SELECT slug FROM organizations WHERE id = <your_org_id>;`
+   */
+  tenantSlug: 'default',
+
   appName: 'Gym (dev)',
   logLevel: 'debug' as 'debug' | 'info' | 'warn' | 'error',
 };
