@@ -45,6 +45,6 @@ export class ShellPage {
 
   async logout(): Promise<void> {
     await this.auth.logout();
-    this.router.navigate(['/auth/login']);
+    await this.router.navigate(['/auth/login']);
   }
 }

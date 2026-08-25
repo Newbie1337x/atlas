@@ -1,0 +1,13 @@
+# Force LF line endings on checkout regardless of OS. Kills the
+# "CRLF will be replaced by LF" warnings on every commit from Windows.
+* text=auto eol=lf
+
+# Binary files git shouldn't diff / normalize
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary

@@ -69,7 +69,7 @@ export class AuthService {
           switchMap((res) => from(this.acceptTokens(res)).pipe(switchMap(() => of(this.currentUser())))),
         );
       }),
-      tap({ error: () => this.logout() }),
+      tap({ error: () => { void this.logout(); } }),
     );
   }
 

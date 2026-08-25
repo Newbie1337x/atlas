@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+
+      # File-size ceilings — see ARCHITECTURE.md §2
+      - name: Size lint
+        run: npm run lint:size
+
+      # ESLint + boundaries — see ARCHITECTURE.md §1, §5, §7
+      - name: Code lint
+        run: npm run lint
+
+      # Type check + build
+      - name: Build
+        run: npm run build

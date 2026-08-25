@@ -1,32 +1,45 @@
 // @ts-check
-import tsPlugin from '@typescript-eslint/eslint-plugin';
-import tsParser from '@typescript-eslint/parser';
+import tseslint from 'typescript-eslint';
 import angular from 'angular-eslint';
 
-/** @type {import('eslint').Linter.Config[]} */
-export default [
+export default tseslint.config(
   {
     ignores: ['dist/**', '.angular/**', 'node_modules/**', 'coverage/**', 'ios/**', 'android/**'],
   },
+
+  // TypeScript files — strict type-checked config + our overrides
   {
     files: ['**/*.ts'],
+    extends: [
+      ...tseslint.configs.recommendedTypeChecked,
+      ...tseslint.configs.stylisticTypeChecked,
+    ],
     languageOptions: {
-      parser: tsParser,
       parserOptions: {
         projectService: true,
         tsconfigRootDir: import.meta.dirname,
       },
     },
     plugins: {
-      '@typescript-eslint': tsPlugin,
       '@angular-eslint': angular.tsPlugin,
     },
     rules: {
-      // Baseline TS rules
+      // Baseline overrides — we let some strict rules WARN not error
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-non-null-assertion': 'warn',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
-      '@typescript-eslint/consistent-type-imports': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'warn',
+      '@typescript-eslint/no-unsafe-member-access': 'warn',
+      '@typescript-eslint/no-unsafe-call': 'warn',
+      '@typescript-eslint/no-unsafe-return': 'warn',
+      '@typescript-eslint/no-unsafe-argument': 'warn',
+      '@typescript-eslint/restrict-template-expressions': 'off',
+
+      // Rules that catch real bugs in signals + rxjs + async code
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': 'error',
+      '@typescript-eslint/await-thenable': 'error',
+      '@typescript-eslint/require-await': 'warn',
 
       // Angular naming
       '@angular-eslint/directive-selector': ['error', { type: 'attribute', prefix: 'app', style: 'camelCase' }],
@@ -50,19 +63,21 @@ export default [
             importNames: ['HttpClient'],
             message:
               'Features MUST call the API via @core/api/ApiClient (or @core/auth/AuthApi for auth endpoints). ' +
-              'Direct HttpClient use bypasses the auth + tenant interceptor. See ARCHITECTURE.md §5.',
+              'Direct HttpClient use bypasses the auth + tenant + error-transform interceptors. See ARCHITECTURE.md §5.',
           },
         ],
       }],
     },
   },
-  // Core is the one place allowed to construct HttpClient
+
+  // Core is exempt from HttpClient block — the only place allowed to build it
   {
     files: ['src/app/core/**/*.ts'],
     rules: {
       'no-restricted-imports': 'off',
     },
   },
+
   // Angular templates
   {
     files: ['**/*.html'],
@@ -77,4 +92,4 @@ export default [
       '@angular-eslint/template/alt-text': 'error',
     },
   },
-];
+);

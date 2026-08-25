@@ -13,6 +13,7 @@ import {
   IonNote,
 } from '@ionic/angular';
 import { AuthService } from '@core/auth/auth.service';
+import { HttpError } from '@core/errors/http-error';
 
 /**
  * Skeleton login. Zero styling by design — visual pass comes later. Only
@@ -95,15 +96,19 @@ export class LoginPage {
     this.auth.login(this.email, this.password).subscribe({
       next: () => {
         const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl') ?? '/';
-        this.router.navigateByUrl(returnUrl);
+        void this.router.navigateByUrl(returnUrl);
       },
-      error: (err) => {
+      error: (err: unknown) => {
         this.loading.set(false);
-        this.error.set(
-          err?.status === 401 ? 'Credenciales inválidas.' :
-          err?.status === 403 ? 'Verificá tu cuenta antes de ingresar.' :
-          'No pudimos ingresar. Intentá de nuevo.',
-        );
+        if (err instanceof HttpError) {
+          this.error.set(
+            err.status === 401 ? 'Credenciales inválidas.' :
+            err.status === 403 ? 'Verificá tu cuenta antes de ingresar.' :
+            err.userMessage,
+          );
+        } else {
+          this.error.set('No pudimos ingresar. Intentá de nuevo.');
+        }
       },
     });
   }

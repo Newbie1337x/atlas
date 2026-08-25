@@ -90,10 +90,13 @@ subscribe/unsubscribe" leak surface that killed us in Gaia.
 ## 5. HTTP goes through `@core/api/ApiClient` (or `AuthApi` for auth-flow endpoints)
 
 Never call `HttpClient` directly from features. Reasons:
-- `Authorization` + `X-Tenant-ID` headers are added by the interceptor — direct
-  calls bypass them and break silently.
-- Base URL prepending is centralized.
-- When we need to add retry / logging / caching, one place changes.
+- `Authorization` + `X-Tenant-ID` headers are added by the auth interceptor —
+  direct calls bypass them and break silently.
+- `HttpErrorResponse` → `HttpError` (typed, Spanish `userMessage`) transformation
+  happens in the error interceptor. Direct calls yield raw responses features
+  don't know how to render.
+- Base URL prepending + 30s timeout (kill zombie requests on flaky mobile signal)
+  live in ApiClient.
 
 Features that need domain-specific endpoints wrap `ApiClient` in a feature
 service (e.g. `features/bookings/bookings.api.ts`), NEVER inject `HttpClient`
@@ -143,7 +146,29 @@ under me" bugs that are unreplayable.
 
 ---
 
-## 10. When you write code, ask yourself:
+## 10. Cross-cutting infrastructure — WHERE things live
+
+Established once so features never invent their own version. Each is a
+lint-catchable pattern.
+
+| Concern           | Where                              | How to consume                                     |
+|-------------------|------------------------------------|----------------------------------------------------|
+| Errors (uncaught) | `GlobalErrorHandler` + `HttpError` | Throw / let bubble; user gets a toast automatically |
+| Logging           | `Logger` (`@core/logger`)          | `inject(Logger).debug/info/warn/error(...)` — never `console.*` |
+| User feedback     | `NotificationService` (`@core/notify`) | `notify.success('...') / .error(...) / .warning(...)` |
+| Blocking spinner  | `LoadingService` (`@core/notify`)  | `loading.wrap(source$, 'Guardando…').subscribe(...)` |
+| Persisted cache   | `enableQueryPersistence()` (`@core/offline`) | Already wired for all TanStack queries |
+| Real-time (chat)  | `@core/realtime/socket.service`    | (Not yet created — see folder README when adding chat) |
+| Current user profile | `@core/user/user-profile.service` | (Not yet created — see folder README when first needed) |
+| Dates             | `date-fns`                         | `import { format, addDays, ... } from 'date-fns'` — NEVER raw `Date` math, NEVER `moment` / `dayjs` |
+| Native platform   | `@capacitor/*` plugins             | Guard native-only APIs with `Capacitor.isNativePlatform()` |
+
+Rule: if you find yourself doing any of these ad-hoc in a feature, STOP and
+promote to the right `@core/` module first.
+
+---
+
+## 11. When you write code, ask yourself:
 
 - Is this in the right layer? (`core` / `features` / `shared`)
 - Does this file cross the size ceiling? Should it split NOW?
