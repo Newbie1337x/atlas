@@ -122,13 +122,23 @@ Import direction (lint-enforced): `features → shared → core`. Features **nev
 
 **Auth endpoints exist and work**:
 ```
-POST /api/auth/login       { email, password } → { token, refreshToken, email, role }
-POST /api/auth/register    { firstName, lastName, email, password }
-POST /api/auth/refresh     { refreshToken } → { token, refreshToken, email, role }
-POST /api/auth/logout
-POST /api/auth/verify      { email, code }
-POST /api/auth/resend-verification
+POST /api/auth/login             { email, password } → { token, refreshToken, email, role }
+POST /api/auth/register          { firstName, lastName, email, password }
+POST /api/auth/signup            (self-service tenant + admin)
+POST /api/auth/refresh           { refreshToken } → { token, refreshToken, email, role }
+POST /api/auth/logout            { refreshToken }
+GET  /api/auth/verify            ?token=...
+POST /api/auth/resend-verification ?email=...
+POST /api/auth/forgot-password   { email }               → 200 always (enum-safe)
+POST /api/auth/reset-password    { token, newPassword }  → 200 or 401
 ```
+
+OAuth (wired at Spring level, needs real Google creds + frontend button):
+```
+GET  /oauth2/authorization/google       (kickoff)
+GET  /login/oauth2/code/google          (callback — Spring handles)
+```
+See Proteus `docs/GOOGLE-OAUTH-SETUP.md` for the full activation guide.
 
 **JWT payload today** (single-role):
 ```json

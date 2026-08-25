@@ -11,11 +11,15 @@ export const environment = {
 
   /**
    * Tenant slug used in the `X-Tenant-Slug` header on every /api/* request.
-   * TODO: replace `'default'` with your actual gym slug from Proteus. Find it via:
-   *   - Proteus admin panel → Organizations
-   *   - or: `SELECT slug FROM organizations WHERE id = <your_org_id>;`
+   * Set 2026-08-25 to the dev tenant created via:
+   *   POST /api/auth/signup { companyName: "Gym Dev Cabrera", ... }
+   * Slug is auto-derived from `name` and stored in organizations.branding_config->>'slug'.
+   *
+   * Dev credentials for the OWNER admin:
+   *   email: admin@gymdev.local
+   *   password: GymDev2026!
    */
-  tenantSlug: 'default',
+  tenantSlug: 'gym-dev-cabrera',
 
   appName: 'Gym (dev)',
   logLevel: 'debug' as 'debug' | 'info' | 'warn' | 'error',
