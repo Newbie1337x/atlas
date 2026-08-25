@@ -317,19 +317,32 @@ Gym context: WiFi is bad in basements. Users must open the app offline and see t
 
 ## 8. Data model conventions
 
-### Muscle groups enum (planned backend expansion)
+### Muscle groups enum (✅ DONE 2026-08-25)
 
-Current backend: `NECK, TRAPS, CHEST, LATS, QUADS, HAMSTRINGS, CARDIO, FULL_BODY` (8 values).
-
-**Target (18 values)** — see PLAYBOOK.md §11 backend changes:
+Backend was actually already at 19 values (initial audit reported wrong). Expanded to **23** with the 4 additions needed for meaningful body heatmap:
 
 ```
-UPPER PUSH:  CHEST, FRONT_DELTS, SIDE_DELTS, TRICEPS
-UPPER PULL:  LATS, UPPER_BACK, REAR_DELTS, BICEPS, FOREARMS
-CORE:        ABS, OBLIQUES
-LOWER:       QUADS, HAMSTRINGS, GLUTES, CALVES
-META:        NECK, CARDIO, FULL_BODY
+Upper body:
+  NECK, TRAPS
+  SHOULDERS ⚠️ deprecated (kept for backward compat with 601 seeded exercises)
+  FRONT_DELTS, SIDE_DELTS, REAR_DELTS  ← new, prefer for new exercises
+  CHEST, LATS, UPPER_BACK, LOWER_BACK
+  BICEPS, TRICEPS, FOREARMS
+
+Core:
+  ABS, OBLIQUES  ← OBLIQUES new
+
+Lower body:
+  QUADS, HAMSTRINGS, GLUTES, CALVES, ADDUCTORS, ABDUCTORS
+
+Meta:
+  CARDIO, FULL_BODY
 ```
+
+**Backwards-compat additive change** — zero DB migration required (stored as `TEXT[]`).
+Frontend body heatmap treats SHOULDERS as legacy bucket; new exercises use specific delts values.
+
+Ref: Proteus commit `b3234c0` on branch `feature/gym-frontend-prep`.
 
 Each exercise has:
 - `primaryMuscles: List<MuscleGroup>` (1-3, the ones targeted)
@@ -431,12 +444,11 @@ Consolidated list of what needs to change in Proteus to unblock V1:
    - Migration to backfill existing users into single-element set
    - **Blocks**: coach features (fase 6a), dual-role UX
 
-2. **Muscle groups enum expansion**
-   - Current: 8 values
-   - Target: 18 values (see §8)
-   - Add to `training/domain/model/MuscleGroup.java`
-   - Migration to re-tag seeded exercises (V17/V18 currently seed with old enum)
-   - **Blocks**: meaningful body heatmap (fase 3b)
+2. **Muscle groups enum expansion** ✅ DONE 2026-08-25
+   - Was 19 → now 23 (added FRONT_DELTS, SIDE_DELTS, REAR_DELTS, OBLIQUES)
+   - Backwards-compat: SHOULDERS kept as deprecated bucket for 601 seeded exercises
+   - Zero DB migration required (`TEXT[]` storage)
+   - Proteus branch: `feature/gym-frontend-prep` commit `b3234c0`
 
 3. **New chat module** — `modules/chat/`
    - Entities: `Conversation, Message, Participant, MessageStatus`

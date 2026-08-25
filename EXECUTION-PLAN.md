@@ -23,6 +23,7 @@ The **operational manual**: in what order, with what gates, until each feature i
 
 | # | Phase | Est. duration | Backend deps | Blocks |
 |---|---|---|---|---|
+| **-1** | Backend micro-tasks (small unblockers) | 1 day (done!) | Proteus source access | Phase 3b |
 | **0** | Foundation validation | 2-3 days | Proteus running + test user | Everything |
 | **1** | Home mock + design tokens + first shared UI | 1 week | Nothing | Phase 2 UX polish |
 | **2** | Auth polish + Profile + Onboarding | 2 weeks | Nothing (all endpoints ready) | Phase 3 needs profile data |
@@ -60,6 +61,38 @@ Backend deps      — what needs to be in Proteus
 Definition of Done — checklist
 Risks             — known unknowns
 ```
+
+---
+
+### PHASE -1 — Backend micro-tasks ✅ DONE 2026-08-25
+
+**Goal**: Ship small, well-scoped backend changes NOW that unblock frontend phases weeks ahead, without waiting for feature convergence.
+
+**Rationale**: Big backend changes (chat module, dual role migration) risk being wrong if built before their frontend consumer exists. But small self-contained additions (enum expansion, endpoint verification) benefit from early delivery — no rework risk, cadence buffer for backend team.
+
+**Deliverables shipped**:
+1. ✅ **Muscle group enum expansion** — added 4 values (FRONT_DELTS, SIDE_DELTS, REAR_DELTS, OBLIQUES). SHOULDERS kept as deprecated backwards-compat bucket. Zero DB migration required.
+   - Proteus branch: `feature/gym-frontend-prep`, commit `b3234c0`
+   - Verified: `mvn compile` + `mvn test` pass (40 tests, 4 Testcontainers Docker skips unrelated)
+2. ✅ **Verified `/api/users/me` exists** — `GET` + `PUT` in `iam/infrastructure/adapters/in/web/UserController.java`. Both accept authenticated principal, return `UserResponse` (mapped). Phase 2 unblocked.
+3. ✅ **Verified auth endpoints shape** — `AuthResponse = {token, refreshToken, email, role}`. Refresh flow exists (`POST /api/auth/refresh`). Contract matches what gym-front skeleton expects.
+
+**Backend deps**: None new — this IS the backend prep.
+
+**Definition of Done**:
+- [x] Muscle enum expanded (23 values total)
+- [x] JavaDoc explains SHOULDERS deprecation + preferred alternatives
+- [x] `mvn compile` passes
+- [x] All non-Docker tests pass
+- [x] Committed + pushed to `feature/gym-frontend-prep` branch (Proteus repo)
+- [x] gym-front PLAYBOOK §8 + §11 updated with ✅ DONE status
+- [x] gitignore updated to exclude `graphify-out/` (was accidentally staged)
+
+**NOT done in this phase** (deliberately deferred):
+- Dual role (`Set<UserRole>` + `COACH`) — big change with migration. Do closer to Phase 6b.
+- Chat module — big scope. Do at Phase 4.5 when frontend is ready.
+- Notifications outbound worker — same, at Phase 4.5.
+- Capabilities endpoint — nice-to-have, do when Phase 5+ needs it.
 
 ---
 
