@@ -21,6 +21,11 @@ export const authRoutes: Routes = [
     loadComponent: () => import('./login.page').then((m) => m.LoginPage),
   },
   {
+    path: 'email',
+    canActivate: [publicOnlyGuard],
+    loadComponent: () => import('./email-login.page').then((m) => m.EmailLoginPage),
+  },
+  {
     path: 'register',
     canActivate: [publicOnlyGuard],
     loadComponent: () => import('./register.page').then((m) => m.RegisterPage),

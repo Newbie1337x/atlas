@@ -1,154 +1,88 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { Router, ActivatedRoute, RouterLink } from '@angular/router';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { Capacitor } from '@capacitor/core';
 import {
-  IonContent,
-  IonHeader,
-  IonTitle,
-  IonToolbar,
-  IonItem,
-  IonLabel,
-  IonInput,
-  IonButton,
-  IonNote,
+  IonContent, IonHeader, IonTitle, IonToolbar,
+  IonButton, IonNote,
 } from '@ionic/angular';
 import { AuthApi } from '@core/auth/auth.api';
-import { AuthService } from '@core/auth/auth.service';
-import { HttpError } from '@core/errors/http-error';
 
 /**
- * Skeleton login. Zero styling by design — visual pass comes later. Only
- * job right now: prove the full flow works end-to-end (form → HttpClient →
- * interceptor → AuthService → storage → guard release → shell load).
+ * Login landing — big social buttons only. Design north star: someone
+ * unfamiliar with tech (a 60+ member joining a gym) should never have to
+ * type an email + password unless they insist. Everything above the fold
+ * is one-tap social login.
+ *
+ * Provider order is platform-adaptive:
+ *   iOS      → [Apple slot when enabled] → Google → Facebook
+ *   Android  → Google → Facebook → [Apple slot when enabled]
+ *   Web      → Google → Facebook → [Apple slot when enabled]
+ *
+ * Apple sign-in is intentionally NOT rendered until we have an Apple
+ * Developer account ($99/yr) + the backend JWT client_secret rotation
+ * scaffolding + a @capacitor-community/apple-sign-in wire-up for native
+ * iOS. Insert the button at position 0 for iOS / end for the rest when
+ * enabling; the ordering above already reflects the shape.
+ *
+ * Email + password is a tiny link under the fold — accessible, but not
+ * inviting. The dedicated page lives at /auth/email so the folks who
+ * DO need it get a focused screen with no other UI in the way.
  */
 @Component({
   selector: 'page-login',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    FormsModule, RouterLink,
+    RouterLink,
     IonContent, IonHeader, IonTitle, IonToolbar,
-    IonItem, IonLabel, IonInput, IonButton, IonNote,
+    IonButton, IonNote,
   ],
   template: `
     <ion-header>
       <ion-toolbar>
-        <ion-title>Login</ion-title>
+        <ion-title>Ingresar</ion-title>
       </ion-toolbar>
     </ion-header>
 
     <ion-content class="ion-padding">
-      <form (ngSubmit)="submit()">
-        <ion-item>
-          <ion-label position="stacked">Email</ion-label>
-          <ion-input
-            type="email"
-            name="email"
-            autocomplete="email"
-            [(ngModel)]="email"
-            required
-          />
-        </ion-item>
-
-        <ion-item>
-          <ion-label position="stacked">Contraseña</ion-label>
-          <ion-input
-            type="password"
-            name="password"
-            autocomplete="current-password"
-            [(ngModel)]="password"
-            required
-          />
-        </ion-item>
-
-        @if (error()) {
-          <ion-note color="danger">{{ error() }}</ion-note>
-        }
-
-        <ion-button
-          type="submit"
-          expand="block"
-          [disabled]="loading()"
-        >
-          {{ loading() ? 'Ingresando…' : 'Ingresar' }}
+      @for (p of providers(); track p.id) {
+        <ion-button expand="block" size="large" (click)="loginWith(p.id)">
+          {{ p.label }}
         </ion-button>
-      </form>
+      }
 
-      <ion-button expand="block" fill="outline" (click)="loginWithGoogle()">
-        Continuar con Google
-      </ion-button>
-
-      <ion-button expand="block" fill="outline" (click)="loginWithFacebook()">
-        Continuar con Facebook
-      </ion-button>
-
-      <ion-button fill="clear" expand="block" routerLink="/auth/forgot-password">
-        ¿Olvidaste tu contraseña?
-      </ion-button>
-
-      <ion-button fill="clear" expand="block" routerLink="/auth/register">
-        Crear cuenta nueva
-      </ion-button>
+      <ion-note class="ion-margin-top">
+        <ion-button fill="clear" size="small" expand="block" routerLink="/auth/email">
+          Ingresar con email
+        </ion-button>
+      </ion-note>
     </ion-content>
   `,
 })
 export class LoginPage {
-  private readonly api    = inject(AuthApi);
-  private readonly auth   = inject(AuthService);
-  private readonly router = inject(Router);
-  private readonly route  = inject(ActivatedRoute);
-
-  protected email    = '';
-  protected password = '';
-  protected readonly loading = signal(false);
-  protected readonly error   = signal<string | null>(null);
-
-  submit(): void {
-    if (!this.email || !this.password) {
-      this.error.set('Completá email y contraseña.');
-      return;
-    }
-    this.loading.set(true);
-    this.error.set(null);
-
-    this.auth.login(this.email, this.password).subscribe({
-      next: () => {
-        const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl') ?? '/';
-        void this.router.navigateByUrl(returnUrl);
-      },
-      error: (err: unknown) => {
-        this.loading.set(false);
-        if (err instanceof HttpError) {
-          // 422 = credentials OK but account deactivated (email not verified yet).
-          // Backend throws BusinessRuleException 'Account is deactivated' which
-          // Zalando maps to 422 UNPROCESSABLE_ENTITY. Reserved 403 for other
-          // forbidden reasons (banned, role-locked) that may land later.
-          this.error.set(
-            err.status === 401 ? 'Credenciales inválidas.' :
-            err.status === 403 || err.status === 422
-              ? 'Verificá tu cuenta desde el link que te llegó por email antes de ingresar.'
-              :
-            err.status === 429 ? 'Demasiados intentos. Probá de nuevo en un minuto.' :
-            err.userMessage,
-          );
-        } else {
-          this.error.set('No pudimos ingresar. Intentá de nuevo.');
-        }
-      },
-    });
-  }
+  private readonly api = inject(AuthApi);
 
   /**
-   * Full-page redirect to Proteus's OAuth2 kickoff. Not an XHR — the OAuth
-   * flow requires a same-tab navigation so Google's login screen can render.
-   * Landing point after Google auth is /auth/oauth-callback (see
-   * OAuthCallbackPage).
+   * Runtime platform. Capacitor.getPlatform() returns 'ios' | 'android' | 'web'.
+   * Read once at construction — platform can't change during a session.
    */
-  loginWithGoogle(): void {
-    window.location.href = this.api.oauthAuthorizeUrl('google');
-  }
+  private readonly platform = Capacitor.getPlatform();
 
-  loginWithFacebook(): void {
-    window.location.href = this.api.oauthAuthorizeUrl('facebook');
+  /**
+   * Providers in the display order for the current platform. Signal-shaped
+   * (computed) so a future 'user hides Facebook' toggle would trigger a
+   * re-render for free.
+   */
+  protected readonly providers = computed<readonly { id: 'google' | 'facebook'; label: string }[]>(() => {
+    const google   = { id: 'google'   as const, label: 'Continuar con Google'   };
+    const facebook = { id: 'facebook' as const, label: 'Continuar con Facebook' };
+    // Same list today (Apple absent) — order stays declarative so inserting
+    // { id: 'apple', label: 'Continuar con Apple' } later is a one-line edit
+    // at the platform-appropriate position.
+    return this.platform === 'ios' ? [google, facebook] : [google, facebook];
+  });
+
+  loginWith(provider: 'google' | 'facebook'): void {
+    window.location.href = this.api.oauthAuthorizeUrl(provider);
   }
 }
