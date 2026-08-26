@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, ActivatedRoute } from '@angular/router';
+import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 import {
   IonContent,
   IonHeader,
@@ -12,6 +12,7 @@ import {
   IonButton,
   IonNote,
 } from '@ionic/angular';
+import { AuthApi } from '@core/auth/auth.api';
 import { AuthService } from '@core/auth/auth.service';
 import { HttpError } from '@core/errors/http-error';
 
@@ -25,7 +26,7 @@ import { HttpError } from '@core/errors/http-error';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    FormsModule,
+    FormsModule, RouterLink,
     IonContent, IonHeader, IonTitle, IonToolbar,
     IonItem, IonLabel, IonInput, IonButton, IonNote,
   ],
@@ -72,10 +73,23 @@ import { HttpError } from '@core/errors/http-error';
           {{ loading() ? 'Ingresando…' : 'Ingresar' }}
         </ion-button>
       </form>
+
+      <ion-button expand="block" fill="outline" (click)="loginWithGoogle()">
+        Continuar con Google
+      </ion-button>
+
+      <ion-button fill="clear" expand="block" routerLink="/auth/forgot-password">
+        ¿Olvidaste tu contraseña?
+      </ion-button>
+
+      <ion-button fill="clear" expand="block" routerLink="/auth/register">
+        Crear cuenta nueva
+      </ion-button>
     </ion-content>
   `,
 })
 export class LoginPage {
+  private readonly api    = inject(AuthApi);
   private readonly auth   = inject(AuthService);
   private readonly router = inject(Router);
   private readonly route  = inject(ActivatedRoute);
@@ -104,6 +118,7 @@ export class LoginPage {
           this.error.set(
             err.status === 401 ? 'Credenciales inválidas.' :
             err.status === 403 ? 'Verificá tu cuenta antes de ingresar.' :
+            err.status === 429 ? 'Demasiados intentos. Probá de nuevo en un minuto.' :
             err.userMessage,
           );
         } else {
@@ -111,5 +126,15 @@ export class LoginPage {
         }
       },
     });
+  }
+
+  /**
+   * Full-page redirect to Proteus's OAuth2 kickoff. Not an XHR — the OAuth
+   * flow requires a same-tab navigation so Google's login screen can render.
+   * Landing point after Google auth is /auth/oauth-callback (see
+   * OAuthCallbackPage).
+   */
+  loginWithGoogle(): void {
+    window.location.href = this.api.oauthAuthorizeUrl('google');
   }
 }
