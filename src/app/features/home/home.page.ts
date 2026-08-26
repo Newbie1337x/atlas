@@ -1,18 +1,27 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { IonContent, IonHeader, IonTitle, IonToolbar } from '@ionic/angular';
-import { AuthService } from '@core/auth/auth.service';
+import { firstValueFrom } from 'rxjs';
+import { injectQuery } from '@tanstack/angular-query-experimental';
+import {
+  IonContent, IonHeader, IonTitle, IonToolbar, IonSpinner, IonNote,
+} from '@ionic/angular';
+import { UsersApi } from '@core/users/users.api';
 
 /**
- * Landing after login. Skinless placeholder — the real dashboard
- * (today's session, streak, next workout, recent activity) is built
- * feature-by-feature as the app grows. For now this just proves the
- * shell + route tree wired correctly and shows who's authenticated.
+ * Home / dashboard. Skinless functional — reads the enriched user profile
+ * from GET /api/users/me and renders the raw facts (name, email, tenant,
+ * linked providers). Real dashboard content (today's session, streak,
+ * recent activity) drops in feature-by-feature as those backends land.
+ *
+ * Query key: ['me']. Shared with profile.page — same cache, no refetch
+ * on navigation between the two.
  */
 @Component({
   selector: 'page-home',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IonContent, IonHeader, IonTitle, IonToolbar],
+  imports: [
+    IonContent, IonHeader, IonTitle, IonToolbar, IonSpinner, IonNote,
+  ],
   template: `
     <ion-header>
       <ion-toolbar>
@@ -21,14 +30,29 @@ import { AuthService } from '@core/auth/auth.service';
     </ion-header>
 
     <ion-content class="ion-padding">
-      <p>Autenticado como: <strong>{{ user()?.email }}</strong></p>
-      <p>Rol activo: {{ user()?.activeRole }}</p>
-      <p>Tenant: {{ user()?.organizationId }}</p>
-      <p>Módulos: {{ (user()?.modules ?? []).join(', ') || '(ninguno)' }}</p>
+      @if (meQuery.isPending()) {
+        <ion-spinner />
+      } @else if (meQuery.isError()) {
+        <ion-note color="danger">No pudimos cargar tu perfil.</ion-note>
+      } @else if (meQuery.data(); as u) {
+        <p>Hola <strong>{{ u.firstName || u.email }}</strong>{{ u.lastName ? ' ' + u.lastName : '' }}</p>
+        @if (u.avatarUrl) {
+          <img [src]="u.avatarUrl" alt="avatar" width="64" height="64" />
+        }
+        <p>Email: {{ u.email }}</p>
+        <p>Rol: {{ u.role }}</p>
+        <p>Tenant: {{ u.organizationId }}</p>
+        <p>Cuentas vinculadas: {{ u.linkedProviders.length ? u.linkedProviders.join(', ') : '(ninguna)' }}</p>
+        <p>Contraseña local: {{ u.hasLocalPassword ? 'sí' : 'no' }}</p>
+      }
     </ion-content>
   `,
 })
 export class HomePage {
-  private readonly auth = inject(AuthService);
-  protected readonly user = this.auth.currentUser;
+  private readonly api = inject(UsersApi);
+
+  protected readonly meQuery = injectQuery(() => ({
+    queryKey: ['me'] as const,
+    queryFn:  () => firstValueFrom(this.api.getMe()),
+  }));
 }
