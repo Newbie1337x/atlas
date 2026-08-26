@@ -115,9 +115,15 @@ export class LoginPage {
       error: (err: unknown) => {
         this.loading.set(false);
         if (err instanceof HttpError) {
+          // 422 = credentials OK but account deactivated (email not verified yet).
+          // Backend throws BusinessRuleException 'Account is deactivated' which
+          // Zalando maps to 422 UNPROCESSABLE_ENTITY. Reserved 403 for other
+          // forbidden reasons (banned, role-locked) that may land later.
           this.error.set(
             err.status === 401 ? 'Credenciales inválidas.' :
-            err.status === 403 ? 'Verificá tu cuenta antes de ingresar.' :
+            err.status === 403 || err.status === 422
+              ? 'Verificá tu cuenta desde el link que te llegó por email antes de ingresar.'
+              :
             err.status === 429 ? 'Demasiados intentos. Probá de nuevo en un minuto.' :
             err.userMessage,
           );
