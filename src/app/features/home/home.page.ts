@@ -7,13 +7,14 @@ import {
 import { UsersApi } from '@core/users/users.api';
 
 /**
- * Home / dashboard. Skinless functional — reads the enriched user profile
- * from GET /api/users/me and renders the raw facts (name, email, tenant,
- * linked providers). Real dashboard content (today's session, streak,
- * recent activity) drops in feature-by-feature as those backends land.
+ * Home tab — the SOCIAL FEED of workouts (Hevy-style Inicio). Merges what
+ * used to be split across two features (dashboard + social).
  *
- * Query key: ['me']. Shared with profile.page — same cache, no refetch
- * on navigation between the two.
+ * Feed content ships in a later slice (backend: SOCIAL module Post/Comment/
+ * Like/Follow + auto-posts from workouts via sourceModule/sourceEventId).
+ * For now the page proves the shell wiring by rendering the user's own
+ * enriched profile via /api/users/me — same query used by /profile so the
+ * cache is shared and navigation between the two doesn't refetch.
  */
 @Component({
   selector: 'page-home',
@@ -39,11 +40,7 @@ import { UsersApi } from '@core/users/users.api';
         @if (u.avatarUrl) {
           <img [src]="u.avatarUrl" alt="avatar" width="64" height="64" />
         }
-        <p>Email: {{ u.email }}</p>
-        <p>Rol: {{ u.role }}</p>
-        <p>Tenant: {{ u.organizationId }}</p>
-        <p>Cuentas vinculadas: {{ u.linkedProviders.length ? u.linkedProviders.join(', ') : '(ninguna)' }}</p>
-        <p>Contraseña local: {{ u.hasLocalPassword ? 'sí' : 'no' }}</p>
+        <p>(Placeholder — acá va el feed social de workouts + sugeridos)</p>
       }
     </ion-content>
   `,

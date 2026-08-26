@@ -4,15 +4,20 @@ import { IonContent, IonNote } from '@ionic/angular';
 import { NetworkService } from '@core/network/network.service';
 
 /**
- * Authenticated app shell. Renders three things:
- *   1. A tiny 'sin conexión' banner at the top when navigator.onLine is false.
- *      Everything below stays working — the banner is informational, no
- *      feature gets disabled by it. Writes queue offline-first.
- *   2. The feature's <router-outlet> (children defined in shell.routes.ts).
- *   3. A temporary text-link nav at the bottom. This is NOT the final nav —
- *      it's a plain link list so we can traverse features while the app is
- *      in the skinless-functional phase. Swap for bottom tab bar / sidebar
- *      / whatever in the design pass; the route structure stays the same.
+ * Authenticated app shell (Hevy-style 3-tab layout, skinless).
+ *
+ * Chrome, top → bottom:
+ *   1. Tiny 'sin conexión' banner when navigator.onLine is false.
+ *      Everything stays functional — banner is informational, no feature
+ *      gets disabled by it. Writes queue offline-first.
+ *   2. Secondary actions row: bell (notifications) + chat icon. NOT in
+ *      the bottom nav — Hevy pattern (Instagram/Strava do the same).
+ *   3. <router-outlet> — the active feature's page.
+ *   4. Primary bottom nav: home / training / profile — the 3 mental
+ *      buckets a gym user thinks in (social + workouts + me).
+ *
+ * All links are text-only for now (skinless functional). Real bottom
+ * tab bar + icons land in the design pass; route structure stays.
  */
 @Component({
   selector: 'page-shell',
@@ -26,13 +31,18 @@ import { NetworkService } from '@core/network/network.service';
       </ion-note>
     }
 
+    <div class="secondary-actions">
+      <a routerLink="/notifications" routerLinkActive="active">🔔 Notificaciones</a>
+      <a routerLink="/chat"          routerLinkActive="active">💬 Chat</a>
+    </div>
+
     <router-outlet />
 
     <nav aria-label="Navegación principal">
       <ul>
-        @for (link of navLinks; track link.path) {
+        @for (tab of primaryTabs; track tab.path) {
           <li>
-            <a [routerLink]="link.path" routerLinkActive="active">{{ link.label }}</a>
+            <a [routerLink]="tab.path" routerLinkActive="active">{{ tab.label }}</a>
           </li>
         }
       </ul>
@@ -43,16 +53,13 @@ export class ShellPage {
   protected readonly network = inject(NetworkService);
 
   /**
-   * Text-link nav — placeholder for the eventual bottom tab bar / sidebar.
-   * Adding a new feature adds an entry here. Keep in sync with children
-   * routes in shell.routes.ts.
+   * Primary tabs — everything else lives OUTSIDE the bottom nav to keep it
+   * to the 3 buckets the user mentally groups by. Adding a fourth here is
+   * a UX regression — think twice.
    */
-  protected readonly navLinks: readonly { path: string; label: string }[] = [
+  protected readonly primaryTabs: readonly { path: string; label: string }[] = [
     { path: '/home',     label: 'Inicio'         },
-    { path: '/routines', label: 'Rutinas'        },
-    { path: '/session',  label: 'Entrenamiento'  },
-    { path: '/social',   label: 'Social'         },
-    { path: '/chat',     label: 'Chat'           },
+    { path: '/training', label: 'Entrenamiento'  },
     { path: '/profile',  label: 'Perfil'         },
   ];
 }
