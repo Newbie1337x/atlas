@@ -78,6 +78,10 @@ import { HttpError } from '@core/errors/http-error';
         Continuar con Google
       </ion-button>
 
+      <ion-button expand="block" fill="outline" (click)="loginWithFacebook()">
+        Continuar con Facebook
+      </ion-button>
+
       <ion-button fill="clear" expand="block" routerLink="/auth/forgot-password">
         ¿Olvidaste tu contraseña?
       </ion-button>
@@ -142,5 +146,9 @@ export class LoginPage {
    */
   loginWithGoogle(): void {
     window.location.href = this.api.oauthAuthorizeUrl('google');
+  }
+
+  loginWithFacebook(): void {
+    window.location.href = this.api.oauthAuthorizeUrl('facebook');
   }
 }
