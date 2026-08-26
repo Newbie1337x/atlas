@@ -133,12 +133,49 @@ POST /api/auth/forgot-password   { email }               → 200 always (enum-sa
 POST /api/auth/reset-password    { token, newPassword }  → 200 or 401
 ```
 
-OAuth (wired at Spring level, needs real Google creds + frontend button):
+OAuth (backend 100% wired, real Google creds already in Proteus `.env`,
+only the frontend button + callback route left to implement):
 ```
-GET  /oauth2/authorization/google       (kickoff)
-GET  /login/oauth2/code/google          (callback — Spring handles)
+GET  /oauth2/authorization/google?tenant_slug=gym-dev-cabrera   (kickoff)
+GET  /login/oauth2/code/google                                  (Google → Spring callback, handled)
+→ 302 → ${OAUTH_SUCCESS_REDIRECT}?token=...&refreshToken=...&email=...&role=...
+       (default: http://localhost:4300/auth/oauth-callback)
 ```
-See Proteus `docs/GOOGLE-OAUTH-SETUP.md` for the full activation guide.
+
+The frontend:
+1. Redirects to the kickoff URL, passing `?tenant_slug=` (or omit — Proteus
+   has `OAUTH_DEFAULT_TENANT_SLUG=gym-dev-cabrera` as fallback).
+2. Adds a router path `/auth/oauth-callback` that reads the 4 query params
+   and calls a new `AuthService.acceptExternalTokens(access, refresh)`
+   which writes them to `SessionStore` without hitting `/api/auth/login`.
+
+See Proteus `docs/GOOGLE-OAUTH-SETUP.md` for the full activation guide +
+backend architecture.
+
+**Profile data written on OAuth login** (relevant when we build the profile
+page — this shapes what `GET /api/users/me` and `GET /api/social/profile/me`
+return):
+
+- `users` row (per-tenant, auth-only): email, firstName, lastName from
+  Google's `given_name`/`family_name`, `organization_id` resolved from the
+  tenant slug. **No avatar column on users**.
+- `global_profiles` row (portable identity, one per verified email):
+  `verified_email` + `avatar_url` (Google's `picture` URL, refreshed every
+  login unless we later add a user-uploaded override). `User.global_profile_id`
+  FK links to it.
+- `social_profiles` row: **NOT** created on OAuth login. Lazily created by
+  the social module the first time the frontend calls
+  `GET /api/social/profile/me`. That's where nickname (`displayName`),
+  `bio`, `birth_date`, `social_links` (JSONB map like
+  `{"instagram":"@handle","tiktok":"..."}`), and social-avatar-override live.
+
+Security guarantees added this backend session:
+- Rate limit on `/forgot-password` (3/min), `/reset-password` (5/min), and
+  the existing `/login` (5/min) / `/register` (3/min) / `/signup` (3/min).
+- Password reset + email verification tokens are hashed (SHA-256) at rest —
+  raw goes only in the email. A DB leak reveals nothing usable.
+- Refresh token reuse detection: presenting an already-revoked refresh
+  token nukes every session of that user (see Proteus commit `ac55390`).
 
 **JWT payload today** (single-role):
 ```json
