@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, publicOnlyGuard } from '@core/auth/auth.guard';
+import { authGuard } from '@core/auth/auth.guard';
 
 /**
  * Root routing skeleton — feature routes are lazy-loaded via `loadChildren`
@@ -8,8 +8,10 @@ import { authGuard, publicOnlyGuard } from '@core/auth/auth.guard';
  */
 export const routes: Routes = [
   {
+    // No guard at this level — publicOnlyGuard sits on the individual login
+    // route inside so OAuth callback stays reachable for logged-in users
+    // (account switch flow). See auth.routes.ts for the reasoning.
     path: 'auth',
-    canActivate: [publicOnlyGuard],
     loadChildren: () => import('@features/auth/auth.routes').then((m) => m.authRoutes),
   },
   {

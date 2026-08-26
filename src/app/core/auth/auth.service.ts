@@ -77,6 +77,23 @@ export class AuthService {
     await this.clearSession();
   }
 
+  /**
+   * External-issue path: the tokens were minted by Proteus's OAuth2 success
+   * handler (Google/Facebook login) and delivered to the frontend via query
+   * params on the /auth/oauth-callback route — no /api/auth/login roundtrip.
+   *
+   * Kept as its own method (not a public alias for acceptTokens) so callers
+   * can't sneak arbitrary LoginResponse shapes in — the only external-token
+   * source is the OAuth callback route.
+   */
+  async acceptExternalTokens(accessToken: string, refreshToken: string): Promise<CurrentUser | null> {
+    // email/role come along in the callback URL but SessionStore derives the
+    // canonical values from the JWT payload — we don't need them for state,
+    // only the tokens themselves need to be persisted.
+    await this.acceptTokens({ token: accessToken, refreshToken, email: '', role: '' });
+    return this.currentUser();
+  }
+
   private async acceptTokens(res: LoginResponse): Promise<void> {
     await this.storage.set(AUTH_STORAGE_KEYS.accessToken, res.token);
     if (res.refreshToken) {
