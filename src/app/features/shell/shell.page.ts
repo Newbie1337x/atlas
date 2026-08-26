@@ -1,51 +1,58 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { Router } from '@angular/router';
-import {
-  IonContent,
-  IonHeader,
-  IonTitle,
-  IonToolbar,
-  IonButton,
-} from '@ionic/angular';
-import { AuthService } from '@core/auth/auth.service';
+import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { IonContent, IonNote } from '@ionic/angular';
+import { NetworkService } from '@core/network/network.service';
 
 /**
- * Placeholder authenticated shell. Real tabs / navigation land here later —
- * for now this only proves the auth flow completed and shows current user.
+ * Authenticated app shell. Renders three things:
+ *   1. A tiny 'sin conexión' banner at the top when navigator.onLine is false.
+ *      Everything below stays working — the banner is informational, no
+ *      feature gets disabled by it. Writes queue offline-first.
+ *   2. The feature's <router-outlet> (children defined in shell.routes.ts).
+ *   3. A temporary text-link nav at the bottom. This is NOT the final nav —
+ *      it's a plain link list so we can traverse features while the app is
+ *      in the skinless-functional phase. Swap for bottom tab bar / sidebar
+ *      / whatever in the design pass; the route structure stays the same.
  */
 @Component({
   selector: 'page-shell',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IonContent, IonHeader, IonTitle, IonToolbar, IonButton],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, IonContent, IonNote],
   template: `
-    <ion-header>
-      <ion-toolbar>
-        <ion-title>Home (placeholder)</ion-title>
-      </ion-toolbar>
-    </ion-header>
+    @if (!network.isOnline()) {
+      <ion-note color="warning" class="ion-padding-horizontal">
+        Sin conexión — se sincronizará cuando vuelva.
+      </ion-note>
+    }
 
-    <ion-content class="ion-padding">
-      <p>Autenticado como: <strong>{{ user()?.email }}</strong></p>
-      <p>Rol activo: {{ user()?.activeRole }}</p>
-      <p>Roles disponibles: {{ (user()?.roles ?? []).join(', ') }}</p>
-      <p>Tenant: {{ user()?.organizationId }}</p>
-      <p>Módulos: {{ (user()?.modules ?? []).join(', ') || '(ninguno)' }}</p>
+    <router-outlet />
 
-      <ion-button expand="block" color="medium" (click)="logout()">
-        Cerrar sesión
-      </ion-button>
-    </ion-content>
+    <nav aria-label="Navegación principal">
+      <ul>
+        @for (link of navLinks; track link.path) {
+          <li>
+            <a [routerLink]="link.path" routerLinkActive="active">{{ link.label }}</a>
+          </li>
+        }
+      </ul>
+    </nav>
   `,
 })
 export class ShellPage {
-  private readonly auth   = inject(AuthService);
-  private readonly router = inject(Router);
+  protected readonly network = inject(NetworkService);
 
-  protected readonly user = this.auth.currentUser;
-
-  async logout(): Promise<void> {
-    await this.auth.logout();
-    await this.router.navigate(['/auth/login']);
-  }
+  /**
+   * Text-link nav — placeholder for the eventual bottom tab bar / sidebar.
+   * Adding a new feature adds an entry here. Keep in sync with children
+   * routes in shell.routes.ts.
+   */
+  protected readonly navLinks: readonly { path: string; label: string }[] = [
+    { path: '/home',     label: 'Inicio'         },
+    { path: '/routines', label: 'Rutinas'        },
+    { path: '/session',  label: 'Entrenamiento'  },
+    { path: '/social',   label: 'Social'         },
+    { path: '/chat',     label: 'Chat'           },
+    { path: '/profile',  label: 'Perfil'         },
+  ];
 }
