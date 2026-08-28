@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { API_BASE_URL } from '@core/auth/auth.tokens';
 import { OffsetPage } from '@core/pagination.model';
+import { CatalogExercise } from './exercise.model';
 import { RoutineFolder, RoutineFolderRequest } from './folder.model';
 import {
   CreateRoutineRequest, RoutineDetail, RoutineSummary, UpdateRoutineRequest,
@@ -75,5 +76,11 @@ export class TrainingApi {
   /** Server-side deep copy — used by "duplicar rutina". Returns the new routine. */
   cloneRoutine(id: number): Observable<RoutineDetail> {
     return this.http.post<RoutineDetail>(`${this.baseUrl}/api/training/routines/${id}/clone`, {});
+  }
+
+  /** Full catalog for the current tenant. Small enough (~a few hundred rows)
+   *  that client-side filter beats a search endpoint round-trip. */
+  listExercises(): Observable<CatalogExercise[]> {
+    return this.http.get<CatalogExercise[]>(`${this.baseUrl}/api/training/exercises`);
   }
 }

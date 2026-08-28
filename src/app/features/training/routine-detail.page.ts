@@ -105,6 +105,7 @@ export class RoutineDetailPage {
     const sheet = await this.sheets.create({
       header: routine.title,
       buttons: [
+        { text: 'Editar ejercicios', handler: () => { this.router.navigate(['/training/routines', routine.id, 'edit']); } },
         { text: 'Renombrar', handler: () => { this.actions.promptRenameRoutine(routine); } },
         { text: 'Duplicar',  handler: () => { this.actions.confirmCloneRoutine(routine); } },
         {
