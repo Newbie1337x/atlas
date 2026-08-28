@@ -46,11 +46,11 @@ export interface RoutineFolder {
   routineCount: number;
 }
 
-/** Server-side Page<T> shape from Spring's OffsetPage / Pageable. */
+/** Mirrors Proteus's shared OffsetPage<T> (NOT Spring's Page<T>). */
 export interface OffsetPage<T> {
-  content: T[];
-  totalElements: number;
-  totalPages: number;
+  items: T[];
+  offset: number;
   size: number;
-  number: number;
+  totalCount: number;
+  hasMore: boolean;
 }

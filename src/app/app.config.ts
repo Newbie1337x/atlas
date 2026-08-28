@@ -42,6 +42,24 @@ const queryClient = new QueryClient({
 });
 enableQueryPersistence(queryClient);
 
+/**
+ * Runtime-resolved API base URL for dev.
+ *
+ * When you open the app from `localhost` it hits `localhost:8080`; when you
+ * open it from a Tailscale/LAN IP (or a MagicDNS hostname) it hits that
+ * same host on :8080. Lets a single dev build serve PC + phone at once
+ * without hardcoding an IP.
+ *
+ * Prod uses `environment.apiUrl` verbatim (that env sets `production: true`
+ * and a real API host).
+ */
+function resolveApiBaseUrl(): string {
+  if (environment.production) return environment.apiUrl;
+  const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+  const isLocal = host === 'localhost' || host === '127.0.0.1';
+  return isLocal ? environment.apiUrl : `http://${host}:8080`;
+}
+
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
@@ -62,7 +80,7 @@ export const appConfig: ApplicationConfig = {
 
     provideTanStackQuery(queryClient),
 
-    { provide: API_BASE_URL,      useValue: environment.apiUrl },
+    { provide: API_BASE_URL,      useFactory: resolveApiBaseUrl },
     { provide: DEFAULT_TENANT_SLUG, useValue: environment.tenantSlug },
 
     { provide: ErrorHandler,      useClass: GlobalErrorHandler },

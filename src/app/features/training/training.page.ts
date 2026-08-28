@@ -96,7 +96,7 @@ export class TrainingPage {
   protected readonly visibleBuckets = computed(() => {
     const folders = this.foldersQuery.data() ?? [];
     const page = this.routinesQuery.data();
-    const routines = page?.content ?? [];
+    const routines = page?.items ?? [];
     const buckets = groupRoutinesByFolder(folders, routines);
     return buckets.filter(b => b.folder != null || b.routines.length > 0);
   });
