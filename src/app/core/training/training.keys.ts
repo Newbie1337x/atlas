@@ -17,4 +17,5 @@ export const trainingKeys = {
   myRoutines: () => [...trainingKeys.all, 'routines', 'me'] as const,
   myRoutinesPage: (offset: number, size: number) =>
     [...trainingKeys.myRoutines(), { offset, size }] as const,
+  routineDetail: (id: number) => [...trainingKeys.all, 'routine', id] as const,
 };

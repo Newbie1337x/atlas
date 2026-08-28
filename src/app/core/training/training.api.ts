@@ -3,8 +3,8 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { API_BASE_URL } from '@core/auth/auth.tokens';
 import {
-  CreateRoutineRequest, OffsetPage, RoutineFolder,
-  RoutineFolderRequest, RoutineSummary,
+  CreateRoutineRequest, OffsetPage, RoutineDetail, RoutineFolder,
+  RoutineFolderRequest, RoutineSummary, UpdateRoutineRequest,
 } from './training.model';
 
 /**
@@ -35,6 +35,11 @@ export class TrainingApi {
     return this.http.get<RoutineFolder[]>(`${this.baseUrl}/api/training/folders`);
   }
 
+  /** Full detail: nested exercises + sets. Backing GET /routines/{id}. */
+  getRoutine(id: number): Observable<RoutineDetail> {
+    return this.http.get<RoutineDetail>(`${this.baseUrl}/api/training/routines/${id}`);
+  }
+
   // --- Mutations. Consumers invalidate ['training'] on success ---
 
   createFolder(body: RoutineFolderRequest): Observable<RoutineFolder> {
@@ -60,5 +65,14 @@ export class TrainingApi {
 
   deleteRoutine(id: number): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/api/training/routines/${id}`);
+  }
+
+  updateRoutine(id: number, body: UpdateRoutineRequest): Observable<RoutineDetail> {
+    return this.http.put<RoutineDetail>(`${this.baseUrl}/api/training/routines/${id}`, body);
+  }
+
+  /** Server-side deep copy — used by "duplicar rutina". Returns the new routine. */
+  cloneRoutine(id: number): Observable<RoutineDetail> {
+    return this.http.post<RoutineDetail>(`${this.baseUrl}/api/training/routines/${id}/clone`, {});
   }
 }

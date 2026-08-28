@@ -4,7 +4,7 @@ import { AlertController } from '@ionic/angular';
 import { injectQueryClient } from '@tanstack/angular-query-experimental';
 import { TrainingApi } from './training.api';
 import { trainingKeys } from './training.keys';
-import { RoutineFolder, RoutineSummary } from './training.model';
+import { RoutineDetail, RoutineFolder, RoutineSummary, UpdateRoutineRequest } from './training.model';
 
 /**
  * Orchestrates every user-initiated mutation on training routines +
@@ -76,7 +76,8 @@ export class TrainingActionsService {
     await this.invalidate();
   }
 
-  async confirmDeleteRoutine(routine: RoutineSummary): Promise<void> {
+  /** Accepts either shape (summary or detail) — only title + id are used. */
+  async confirmDeleteRoutine(routine: { id: number; title: string }): Promise<void> {
     const ok = await this.confirm({
       header: 'Borrar rutina',
       message: `¿Borrar "${routine.title}"? No se puede deshacer.`,
@@ -85,6 +86,34 @@ export class TrainingActionsService {
     });
     if (!ok) return;
     await firstValueFrom(this.api.deleteRoutine(routine.id));
+    await this.invalidate();
+  }
+
+  /**
+   * Rename lives on the detail page — we already have the full routine
+   * so we can spread it into the PUT without a second fetch. The API
+   * enforces title as the only required field; everything else is
+   * preserved verbatim.
+   */
+  async promptRenameRoutine(routine: RoutineDetail): Promise<void> {
+    const title = await this.promptText({
+      header: 'Renombrar rutina',
+      value: routine.title,
+      placeholder: 'Nombre',
+    });
+    if (!title || title === routine.title) return;
+    await firstValueFrom(this.api.updateRoutine(routine.id, toUpdateRequest(routine, { title })));
+    await this.invalidate();
+  }
+
+  async confirmCloneRoutine(routine: RoutineDetail): Promise<void> {
+    const ok = await this.confirm({
+      header: 'Duplicar rutina',
+      message: `Se creará una copia editable de "${routine.title}".`,
+      confirmText: 'Duplicar',
+    });
+    if (!ok) return;
+    await firstValueFrom(this.api.cloneRoutine(routine.id));
     await this.invalidate();
   }
 
@@ -141,4 +170,41 @@ export class TrainingActionsService {
     const { role } = await alert.onDidDismiss();
     return role === 'confirm';
   }
+}
+
+/**
+ * Maps a full RoutineDetail into the narrower PUT payload — strips the
+ * enricher-only fields (exerciseName / iconUrl) that the server ignores
+ * on write anyway, so nothing ends up mixed with domain data. Optional
+ * `overrides` mutate only the top-level fields; exercises stay verbatim
+ * (rename / move a routine should not tear down its sets).
+ */
+export function toUpdateRequest(
+  routine: RoutineDetail,
+  overrides: Partial<UpdateRoutineRequest> = {},
+): UpdateRoutineRequest {
+  return {
+    title: routine.title,
+    notes: routine.notes,
+    folderId: routine.folderId,
+    displayOrder: routine.displayOrder,
+    exercises: routine.exercises.map(ex => ({
+      orderIndex: ex.orderIndex,
+      exerciseId: ex.exerciseId,
+      restSeconds: ex.restSeconds,
+      supersetGroupId: ex.supersetGroupId,
+      notes: ex.notes,
+      sets: ex.sets.map(s => ({
+        orderIndex: s.orderIndex,
+        setType: s.setType,
+        targetRepsMin: s.targetRepsMin,
+        targetRepsMax: s.targetRepsMax,
+        targetWeightKg: s.targetWeightKg,
+        targetDurationSeconds: s.targetDurationSeconds,
+        targetDistanceKm: s.targetDistanceKm,
+        targetRpe: s.targetRpe,
+      })),
+    })),
+    ...overrides,
+  };
 }

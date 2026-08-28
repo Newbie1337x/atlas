@@ -46,6 +46,49 @@ export interface RoutineFolder {
   routineCount: number;
 }
 
+/** Set type — mirrors backend SetType enum. */
+export type SetType = 'WARMUP' | 'WORKING' | 'DROP' | 'FAILURE';
+
+/** One set inside an exercise. Ranges + optional targets — see backend RoutineResponse.RoutineSetDto. */
+export interface RoutineSet {
+  id: number;
+  orderIndex: number;
+  setType: SetType;
+  targetRepsMin: number | null;
+  targetRepsMax: number | null;
+  targetWeightKg: number | null;
+  targetDurationSeconds: number | null;
+  targetDistanceKm: number | null;
+  targetRpe: number | null;
+}
+
+/** One exercise in a routine. */
+export interface RoutineExercise {
+  id: number;
+  orderIndex: number;
+  exerciseId: number;
+  exerciseName: string | null;
+  exerciseIconUrl: string | null;
+  restSeconds: number | null;
+  supersetGroupId: string | null;
+  notes: string | null;
+  sets: RoutineSet[];
+}
+
+/** Full routine detail (backend RoutineResponse) — used by GET /{id}. */
+export interface RoutineDetail {
+  id: number;
+  organizationId: number;
+  ownerType: RoutineOwnerType;
+  ownerGlobalProfileId: number;
+  sourceRoutineId: number | null;
+  title: string;
+  notes: string | null;
+  folderId: number | null;
+  displayOrder: number;
+  exercises: RoutineExercise[];
+}
+
 /**
  * Payload for POST/PUT of a routine folder. Both fields optional on PUT
  * (null = leave as-is). On POST the backend requires a non-blank name.
@@ -66,6 +109,35 @@ export interface CreateRoutineRequest {
   displayOrder?: number;
   notes?: string;
   exercises?: never[];
+}
+
+/**
+ * Full-body PUT for updating a routine. Backend requires title; everything
+ * else is optional. Exercises follow the same shape as the response (minus
+ * the enriched name/iconUrl which the server ignores on write).
+ */
+export interface UpdateRoutineRequest {
+  title: string;
+  notes?: string | null;
+  folderId?: number | null;
+  displayOrder?: number;
+  exercises: Array<{
+    orderIndex: number;
+    exerciseId: number;
+    restSeconds?: number | null;
+    supersetGroupId?: string | null;
+    notes?: string | null;
+    sets: Array<{
+      orderIndex: number;
+      setType: SetType;
+      targetRepsMin?: number | null;
+      targetRepsMax?: number | null;
+      targetWeightKg?: number | null;
+      targetDurationSeconds?: number | null;
+      targetDistanceKm?: number | null;
+      targetRpe?: number | null;
+    }>;
+  }>;
 }
 
 /** Mirrors Proteus's shared OffsetPage<T> (NOT Spring's Page<T>). */
