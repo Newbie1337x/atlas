@@ -1,7 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { IonItem, IonLabel, IonNote, IonButton } from '@ionic/angular';
+import {
+  IonItem, IonLabel, IonNote, IonButton, IonIcon, ActionSheetController,
+} from '@ionic/angular';
+import { addIcons } from 'ionicons';
+import { ellipsisVertical } from 'ionicons/icons';
 import { RoutineSummary } from '@core/training/training.model';
+import { TrainingActionsService } from '@core/training/training-actions.service';
 
 /**
  * One routine row in the training list. Tap the row → opens detail;
@@ -16,9 +21,9 @@ import { RoutineSummary } from '@core/training/training.model';
   selector: 'training-routine-card',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, IonItem, IonLabel, IonNote, IonButton],
+  imports: [RouterLink, IonItem, IonLabel, IonNote, IonButton, IonIcon],
   template: `
-    <ion-item [routerLink]="['/training/routines', routine().id]" button [detail]="true">
+    <ion-item [routerLink]="['/training/routines', routine().id]" button [detail]="false">
       <ion-label>
         <h3>{{ routine().title }}</h3>
         <p>
@@ -39,11 +44,26 @@ import { RoutineSummary } from '@core/training/training.model';
         [queryParams]="{ routineId: routine().id }">
         Empezar
       </ion-button>
+      <ion-button
+        slot="end"
+        fill="clear"
+        size="small"
+        (click)="openMenu(); $event.stopPropagation(); $event.preventDefault()"
+        aria-label="Opciones de la rutina">
+        <ion-icon slot="icon-only" name="ellipsis-vertical" />
+      </ion-button>
     </ion-item>
   `,
 })
 export class RoutineCardComponent {
   readonly routine = input.required<RoutineSummary>();
+
+  private readonly actions = inject(TrainingActionsService);
+  private readonly sheets = inject(ActionSheetController);
+
+  constructor() {
+    addIcons({ 'ellipsis-vertical': ellipsisVertical });
+  }
 
   protected readonly previewText = computed(() => {
     const previews = this.routine().exercisePreviews;
@@ -51,4 +71,16 @@ export class RoutineCardComponent {
     const names = previews.map(p => p.name).filter((n): n is string => !!n);
     return names.length ? names.join(' · ') : null;
   });
+
+  protected async openMenu(): Promise<void> {
+    const r = this.routine();
+    const sheet = await this.sheets.create({
+      header: r.title,
+      buttons: [
+        { text: 'Borrar rutina', role: 'destructive', handler: () => { this.actions.confirmDeleteRoutine(r); } },
+        { text: 'Cancelar', role: 'cancel' },
+      ],
+    });
+    await sheet.present();
+  }
 }

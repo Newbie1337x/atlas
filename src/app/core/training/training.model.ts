@@ -46,6 +46,28 @@ export interface RoutineFolder {
   routineCount: number;
 }
 
+/**
+ * Payload for POST/PUT of a routine folder. Both fields optional on PUT
+ * (null = leave as-is). On POST the backend requires a non-blank name.
+ */
+export interface RoutineFolderRequest {
+  name?: string;
+  displayOrder?: number;
+}
+
+/**
+ * Minimal shape for creating a routine from the training list. Full editing
+ * (exercises + sets) uses the same DTO on PUT — with the exercises array
+ * populated — but that's the routine-editor page, not this slice.
+ */
+export interface CreateRoutineRequest {
+  title: string;
+  folderId?: number | null;
+  displayOrder?: number;
+  notes?: string;
+  exercises?: never[];
+}
+
 /** Mirrors Proteus's shared OffsetPage<T> (NOT Spring's Page<T>). */
 export interface OffsetPage<T> {
   items: T[];

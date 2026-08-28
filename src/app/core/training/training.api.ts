@@ -2,7 +2,10 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { API_BASE_URL } from '@core/auth/auth.tokens';
-import { OffsetPage, RoutineFolder, RoutineSummary } from './training.model';
+import {
+  CreateRoutineRequest, OffsetPage, RoutineFolder,
+  RoutineFolderRequest, RoutineSummary,
+} from './training.model';
 
 /**
  * HTTP endpoints for the TRAINING module — routines + folders that the
@@ -30,5 +33,32 @@ export class TrainingApi {
   /** All folders owned by the caller — each carries a routineCount. */
   listFolders(): Observable<RoutineFolder[]> {
     return this.http.get<RoutineFolder[]>(`${this.baseUrl}/api/training/folders`);
+  }
+
+  // --- Mutations. Consumers invalidate ['training'] on success ---
+
+  createFolder(body: RoutineFolderRequest): Observable<RoutineFolder> {
+    return this.http.post<RoutineFolder>(`${this.baseUrl}/api/training/folders`, body);
+  }
+
+  updateFolder(id: number, body: RoutineFolderRequest): Observable<RoutineFolder> {
+    return this.http.put<RoutineFolder>(`${this.baseUrl}/api/training/folders/${id}`, body);
+  }
+
+  deleteFolder(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/api/training/folders/${id}`);
+  }
+
+  createRoutine(body: CreateRoutineRequest): Observable<unknown> {
+    // Backend returns the enriched RoutineResponse but this endpoint's
+    // consumers only care that it succeeded — the training list refetches.
+    return this.http.post<unknown>(`${this.baseUrl}/api/training/routines`, {
+      ...body,
+      exercises: body.exercises ?? [],
+    });
+  }
+
+  deleteRoutine(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/api/training/routines/${id}`);
   }
 }

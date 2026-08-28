@@ -7,6 +7,7 @@ import {
   IonButton, IonNote, IonSpinner,
 } from '@ionic/angular';
 import { TrainingApi } from '@core/training/training.api';
+import { TrainingActionsService } from '@core/training/training-actions.service';
 import { trainingKeys } from '@core/training/training.keys';
 import {
   groupRoutinesByFolder, RoutineBucket,
@@ -52,6 +53,12 @@ import { FolderSectionComponent } from './routines/folder-section.component';
       <ion-button fill="outline" expand="block" routerLink="/training/explore">
         Explorar templates
       </ion-button>
+      <ion-button fill="outline" expand="block" (click)="actions.promptCreateFolder()">
+        Nueva carpeta
+      </ion-button>
+      <ion-button fill="outline" expand="block" (click)="actions.promptCreateRoutine()">
+        Nueva rutina
+      </ion-button>
 
       @if (foldersQuery.isPending() || routinesQuery.isPending()) {
         <ion-spinner />
@@ -64,6 +71,7 @@ import { FolderSectionComponent } from './routines/folder-section.component';
         @for (bucket of visibleBuckets(); track bucketKey(bucket)) {
           <training-folder-section
             [label]="bucket.folder?.name ?? 'Mis rutinas'"
+            [folder]="bucket.folder"
             [routines]="bucket.routines" />
         }
       }
@@ -72,6 +80,7 @@ import { FolderSectionComponent } from './routines/folder-section.component';
 })
 export class TrainingPage {
   private readonly api = inject(TrainingApi);
+  protected readonly actions = inject(TrainingActionsService);
 
   /** Default first page — pagination controls arrive when a real user starts
    *  hitting >20 routines (not this milestone). */
