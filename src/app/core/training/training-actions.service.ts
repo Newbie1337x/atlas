@@ -4,7 +4,8 @@ import { AlertController } from '@ionic/angular';
 import { injectQueryClient } from '@tanstack/angular-query-experimental';
 import { TrainingApi } from './training.api';
 import { trainingKeys } from './training.keys';
-import { RoutineDetail, RoutineFolder, RoutineSummary, UpdateRoutineRequest } from './training.model';
+import { RoutineFolder } from './folder.model';
+import { RoutineDetail, UpdateRoutineRequest } from './routine.model';
 
 /**
  * Orchestrates every user-initiated mutation on training routines +

@@ -4,7 +4,8 @@ import {
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { chevronDown, chevronForward, ellipsisVertical } from 'ionicons/icons';
-import { RoutineFolder, RoutineSummary } from '@core/training/training.model';
+import { RoutineFolder } from '@core/training/folder.model';
+import { RoutineSummary } from '@core/training/routine.model';
 import { TrainingActionsService } from '@core/training/training-actions.service';
 import { RoutineCardComponent } from './routine-card.component';
 

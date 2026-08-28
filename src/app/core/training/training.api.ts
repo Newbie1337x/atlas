@@ -2,10 +2,11 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { API_BASE_URL } from '@core/auth/auth.tokens';
+import { OffsetPage } from '@core/pagination.model';
+import { RoutineFolder, RoutineFolderRequest } from './folder.model';
 import {
-  CreateRoutineRequest, OffsetPage, RoutineDetail, RoutineFolder,
-  RoutineFolderRequest, RoutineSummary, UpdateRoutineRequest,
-} from './training.model';
+  CreateRoutineRequest, RoutineDetail, RoutineSummary, UpdateRoutineRequest,
+} from './routine.model';
 
 /**
  * HTTP endpoints for the TRAINING module — routines + folders that the

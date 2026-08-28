@@ -5,7 +5,7 @@ import {
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { ellipsisVertical } from 'ionicons/icons';
-import { RoutineSummary } from '@core/training/training.model';
+import { RoutineSummary } from '@core/training/routine.model';
 import { TrainingActionsService } from '@core/training/training-actions.service';
 
 /**

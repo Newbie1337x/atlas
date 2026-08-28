@@ -12,7 +12,7 @@ import { ellipsisVertical } from 'ionicons/icons';
 import { TrainingApi } from '@core/training/training.api';
 import { TrainingActionsService } from '@core/training/training-actions.service';
 import { trainingKeys } from '@core/training/training.keys';
-import { RoutineDetail } from '@core/training/training.model';
+import { RoutineDetail } from '@core/training/routine.model';
 import { RoutineExerciseListComponent } from './routine-detail/routine-exercise-list.component';
 
 /**

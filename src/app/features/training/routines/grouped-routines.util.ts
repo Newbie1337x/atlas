@@ -1,4 +1,5 @@
-import { RoutineFolder, RoutineSummary } from '@core/training/training.model';
+import { RoutineFolder } from '@core/training/folder.model';
+import { RoutineSummary } from '@core/training/routine.model';
 
 /**
  * Sorted view of the user's routines, grouped for rendering:

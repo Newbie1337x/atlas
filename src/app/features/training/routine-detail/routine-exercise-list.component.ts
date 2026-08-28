@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { IonList, IonItem, IonLabel, IonNote } from '@ionic/angular';
-import { RoutineExercise } from '@core/training/training.model';
+import { RoutineExercise } from '@core/training/routine.model';
 
 /**
  * Read-only render of a routine's exercises + sets. Skinless — plays the
