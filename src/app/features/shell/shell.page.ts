@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { IonContent, IonNote } from '@ionic/angular';
+import { RouterLink, RouterLinkActive } from '@angular/router';
+import { IonNote, IonRouterOutlet } from '@ionic/angular';
 import { NetworkService } from '@core/network/network.service';
 
 /**
@@ -12,7 +12,7 @@ import { NetworkService } from '@core/network/network.service';
  *      gets disabled by it. Writes queue offline-first.
  *   2. Secondary actions row: bell (notifications) + chat icon. NOT in
  *      the bottom nav — Hevy pattern (Instagram/Strava do the same).
- *   3. <router-outlet> — the active feature's page.
+ *   3. <ion-router-outlet> — the active feature's page.
  *   4. Primary bottom nav: home / training / profile — the 3 mental
  *      buckets a gym user thinks in (social + workouts + me).
  *
@@ -23,10 +23,55 @@ import { NetworkService } from '@core/network/network.service';
   selector: 'page-shell',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, IonContent, IonNote],
+  imports: [RouterLink, RouterLinkActive, IonNote, IonRouterOutlet],
+  styles: [`
+    :host {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      height: 100dvh;
+      background: var(--ion-background-color, #fff);
+    }
+    .offline-banner {
+      display: block;
+      padding: 8px;
+      text-align: center;
+    }
+    .secondary-actions {
+      display: flex;
+      gap: 16px;
+      padding: 16px;
+      border-bottom: 1px solid var(--ion-color-step-150, #eee);
+      background: var(--ion-color-step-50, #f9f9f9);
+    }
+    .main-content {
+      flex: 1;
+      position: relative;
+    }
+    nav {
+      padding: 16px;
+      border-top: 1px solid var(--ion-color-step-150, #eee);
+      background: var(--ion-color-step-50, #f9f9f9);
+    }
+    nav ul {
+      display: flex;
+      justify-content: space-around;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    a {
+      text-decoration: none;
+      color: var(--ion-text-color, #333);
+    }
+    a.active {
+      font-weight: bold;
+      color: var(--ion-color-primary, #000);
+    }
+  `],
   template: `
     @if (!network.isOnline()) {
-      <ion-note color="warning" class="ion-padding-horizontal">
+      <ion-note color="warning" class="offline-banner ion-padding-horizontal">
         Sin conexión — se sincronizará cuando vuelva.
       </ion-note>
     }
@@ -36,7 +81,9 @@ import { NetworkService } from '@core/network/network.service';
       <a routerLink="/chat"          routerLinkActive="active">💬 Chat</a>
     </div>
 
-    <router-outlet />
+    <div class="main-content">
+      <ion-router-outlet></ion-router-outlet>
+    </div>
 
     <nav aria-label="Navegación principal">
       <ul>
