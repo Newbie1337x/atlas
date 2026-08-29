@@ -159,7 +159,9 @@ export class ExerciseEditorComponent {
     this.longPressStart = { x: ev.clientX, y: ev.clientY };
     this.longPressTimer = setTimeout(() => {
       this.longPressTimer = null;
-      this.openMenu();
+      // Hold jumps straight to reorder — Hevy pattern. The ⋮ button still
+      // opens the ActionSheet with rename / replace / superset / delete.
+      this.openReorder();
     }, ExerciseEditorComponent.LONG_PRESS_MS);
   }
 
