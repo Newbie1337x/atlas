@@ -12,6 +12,7 @@ import { TrainingActionsService } from '@core/training/training-actions.service'
 import { RoutineEditFormService } from './routine-edit-form.service';
 import { SetEditorComponent } from './set-editor.component';
 import { ExerciseIconComponent } from '../shared/exercise-icon.component';
+import { RestPickerComponent } from '../shared/rest-picker.component';
 import { ReorderExercisesModalComponent } from './reorder-exercises-modal.component';
 
 /**
@@ -32,7 +33,7 @@ import { ReorderExercisesModalComponent } from './reorder-exercises-modal.compon
     FormsModule,
     IonCard, IonCardHeader, IonCardTitle, IonCardContent,
     IonButton, IonIcon, IonInput,
-    SetEditorComponent, ExerciseIconComponent,
+    SetEditorComponent, ExerciseIconComponent, RestPickerComponent,
   ],
   styles: [`
     .header {
@@ -54,14 +55,6 @@ import { ReorderExercisesModalComponent } from './reorder-exercises-modal.compon
       text-transform: uppercase;
     }
     .header-legend .num { text-align: right; }
-    .field-row {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-    .field-row ion-input {
-      flex: 1;
-    }
   `],
   template: `
     <ion-card>
@@ -88,19 +81,15 @@ import { ReorderExercisesModalComponent } from './reorder-exercises-modal.compon
       </ion-card-header>
 
       <ion-card-content>
-        <div class="field-row">
-          <ion-input
-            label="Descanso (s)"
-            labelPlacement="stacked"
-            type="number"
-            [ngModel]="exercise().restSeconds"
-            (ngModelChange)="form.updateExerciseRest(index(), numeric($event))" />
-          <ion-input
-            label="Notas"
-            labelPlacement="stacked"
-            [ngModel]="exercise().notes"
-            (ngModelChange)="form.updateExerciseNotes(index(), $event)" />
-        </div>
+        <training-rest-picker
+          [value]="exercise().restSeconds"
+          (valueChange)="form.updateExerciseRest(index(), $event)" />
+
+        <ion-input
+          label="Notas"
+          labelPlacement="stacked"
+          [ngModel]="exercise().notes"
+          (ngModelChange)="form.updateExerciseNotes(index(), $event)" />
 
         <div class="header-legend">
           <span>Tipo</span>
@@ -138,12 +127,6 @@ export class ExerciseEditorComponent {
 
   constructor() {
     addIcons({ 'add-outline': addOutline, 'ellipsis-vertical': ellipsisVertical });
-  }
-
-  protected numeric(raw: unknown): number | null {
-    if (raw == null || raw === '') return null;
-    const n = Number(raw);
-    return Number.isFinite(n) ? n : null;
   }
 
   // ---------- Long-press on header → same ActionSheet ----------
