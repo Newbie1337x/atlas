@@ -10,7 +10,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { UsersApi } from '@core/users/users.api';
 
 /**
- * Profile main landing (Hevy pattern):
+ * Profile main landing:
  *   - Header: avatar + username + firstName/lastName + basic stats
  *   - Sub-nav to the secondary pages (stats / exercises / measurements /
  *     calendar / settings) — each is its own lazy route so this landing

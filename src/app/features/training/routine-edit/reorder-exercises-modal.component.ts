@@ -10,7 +10,7 @@ import { RoutineEditFormService } from './routine-edit-form.service';
 import { ExerciseIconComponent } from '../shared/exercise-icon.component';
 
 /**
- * Dedicated full-screen reorder screen — Hevy pattern.
+ * Dedicated full-screen reorder screen.
  *
  * Interaction: uses Angular CDK DragDrop (not Ionic's ion-reorder) so we
  * can require a 500 ms hold before the drag starts. Ion-reorder activates

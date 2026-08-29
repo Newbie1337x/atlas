@@ -6,7 +6,7 @@ import {
 
 /**
  * Notifications list — accessed via the bell icon in the shell header.
- * NOT in the bottom nav (Hevy pattern). Reads from a notifications feed
+ * NOT in the bottom nav. Reads from a notifications feed
  * once the backend `notifications` module lands (post-fase 4.5).
  */
 @Component({

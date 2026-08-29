@@ -15,7 +15,7 @@ import {
 import { FolderSectionComponent } from './routines/folder-section.component';
 
 /**
- * Training tab landing (Hevy-style):
+ * Training tab landing:
  *   1. Header actions to start an empty workout / open explore.
  *   2. Folder sections in displayOrder, each with its routines
  *      sorted by displayOrder.

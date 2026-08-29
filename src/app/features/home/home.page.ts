@@ -7,7 +7,7 @@ import {
 import { UsersApi } from '@core/users/users.api';
 
 /**
- * Home tab — the SOCIAL FEED of workouts (Hevy-style Inicio). Merges what
+ * Home tab — the SOCIAL FEED of workouts. Merges what
  * used to be split across two features (dashboard + social).
  *
  * Feed content ships in a later slice (backend: SOCIAL module Post/Comment/

@@ -16,7 +16,7 @@ import { ReorderExercisesModalComponent } from './reorder-exercises-modal.compon
 /**
  * One exercise inside the routine editor. Header shows the name + a single
  * ellipsis (⋮) button that opens an ActionSheet with every per-exercise
- * action (Hevy pattern): reorder — replace — superset — delete. The old
+ * action: reorder — replace — superset — delete. The old
  * inline drag handle + trash icon were removed because on a phone the
  * small tap targets competed with the tap-to-edit affordance of the card.
  *
@@ -159,8 +159,8 @@ export class ExerciseEditorComponent {
     this.longPressStart = { x: ev.clientX, y: ev.clientY };
     this.longPressTimer = setTimeout(() => {
       this.longPressTimer = null;
-      // Hold jumps straight to reorder — Hevy pattern. The ⋮ button still
-      // opens the ActionSheet with rename / replace / superset / delete.
+      // Hold jumps straight to reorder. The ⋮ button still opens the
+      // ActionSheet with rename / replace / superset / delete.
       this.openReorder();
     }, ExerciseEditorComponent.LONG_PRESS_MS);
   }

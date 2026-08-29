@@ -4,14 +4,14 @@ import { IonNote, IonRouterOutlet } from '@ionic/angular';
 import { NetworkService } from '@core/network/network.service';
 
 /**
- * Authenticated app shell (Hevy-style 3-tab layout, skinless).
+ * Authenticated app shell (3-tab layout, skinless).
  *
  * Chrome, top → bottom:
  *   1. Tiny 'sin conexión' banner when navigator.onLine is false.
  *      Everything stays functional — banner is informational, no feature
  *      gets disabled by it. Writes queue offline-first.
  *   2. Secondary actions row: bell (notifications) + chat icon. NOT in
- *      the bottom nav — Hevy pattern (Instagram/Strava do the same).
+ *      the bottom nav (Instagram/Strava layout).
  *   3. <ion-router-outlet> — the active feature's page.
  *   4. Primary bottom nav: home / training / profile — the 3 mental
  *      buckets a gym user thinks in (social + workouts + me).

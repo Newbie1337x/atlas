@@ -93,7 +93,7 @@ export class RoutineEditFormService {
 
   // ---------- Sets ----------
 
-  /** Clones the last set of the exercise (Hevy pattern — likely what the user wants). */
+  /** Clones the last set of the exercise — likely what the user wants. */
   addSet(exerciseIndex: number): void {
     this.updateExerciseAt(exerciseIndex, ex => {
       const last = ex.sets[ex.sets.length - 1];
