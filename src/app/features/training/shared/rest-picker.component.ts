@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, input, output, signal } from '@angular/core';
 import {
   IonItem, IonLabel, IonIcon,
-  IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonContent,
+  IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton,
   IonPicker, IonPickerColumn, IonPickerColumnOption,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
@@ -27,17 +27,17 @@ import { REST_OPTIONS, formatRestSeconds } from './rest-values';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     IonItem, IonLabel, IonIcon,
-    IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonContent,
+    IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton,
     IonPicker, IonPickerColumn, IonPickerColumnOption,
   ],
   styles: [`
-    ion-modal {
-      --height: auto;
-    }
-    .picker-shell {
-      display: flex;
-      flex-direction: column;
-      max-height: 60vh;
+    /* Picker column collapses when nested in ion-content inside a
+       breakpoint-based ion-modal, so we let it sit as a direct sibling
+       of ion-header. Reserving a min height keeps the wheel visible
+       even when the modal grows/shrinks with the breakpoint drag. */
+    ion-picker {
+      min-height: 216px;
+      display: block;
     }
   `],
   template: `
@@ -55,29 +55,25 @@ import { REST_OPTIONS, formatRestSeconds } from './rest-values';
       [breakpoints]="[0, 0.5]"
       (ionModalDidDismiss)="open.set(false)">
       <ng-template>
-        <div class="picker-shell">
-          <ion-header>
-            <ion-toolbar>
-              <ion-title>Descanso</ion-title>
-              <ion-buttons slot="end">
-                <ion-button (click)="open.set(false)">Listo</ion-button>
-              </ion-buttons>
-            </ion-toolbar>
-          </ion-header>
-          <ion-content>
-            <ion-picker>
-              <ion-picker-column
-                [value]="pickerValue()"
-                (ionChange)="onPick($event)">
-                @for (opt of options; track opt) {
-                  <ion-picker-column-option [value]="opt">
-                    {{ format(opt) }}
-                  </ion-picker-column-option>
-                }
-              </ion-picker-column>
-            </ion-picker>
-          </ion-content>
-        </div>
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Descanso</ion-title>
+            <ion-buttons slot="end">
+              <ion-button (click)="open.set(false)">Listo</ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-picker>
+          <ion-picker-column
+            [value]="pickerValue()"
+            (ionChange)="onPick($event)">
+            @for (opt of options; track opt) {
+              <ion-picker-column-option [value]="opt">
+                {{ format(opt) }}
+              </ion-picker-column-option>
+            }
+          </ion-picker-column>
+        </ion-picker>
       </ng-template>
     </ion-modal>
   `,
