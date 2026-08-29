@@ -41,8 +41,7 @@ import { REST_OPTIONS, formatRestSeconds } from './rest-values';
       left: 0;
       right: 0;
       bottom: 0;
-      height: 50vh;
-      max-height: 440px;
+      height: auto;
       z-index: 1001;
       background: var(--ion-background-color, #1c1c1e);
       border-radius: 16px 16px 0 0;
@@ -83,10 +82,9 @@ import { REST_OPTIONS, formatRestSeconds } from './rest-values';
     /* --- Wheel --- */
     .wheel-shell {
       position: relative;
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      /* Fixed height so scroll-snap math is deterministic and padding
+         can be a straight pixel value. */
+      height: 264px;                /* 6 rows × 44px */
       overflow: hidden;
     }
     .wheel {
@@ -103,9 +101,9 @@ import { REST_OPTIONS, formatRestSeconds } from './rest-values';
     }
     .wheel::-webkit-scrollbar { display: none; }
     .wheel-inner {
-      /* Padding so first / last items can center in the highlight strip.
-         Computed from the sheet's inner-half minus one item-half. */
-      padding-block: calc(50% - 22px);
+      /* Padding so first / last items can center in the highlight strip:
+         (wheel-shell 264 - item 44) / 2 = 110. */
+      padding-block: 110px;
     }
     .wheel-item {
       height: 44px;
@@ -199,8 +197,11 @@ export class RestPickerComponent {
 
   protected open(): void {
     this.isOpen.set(true);
-    // Wait for the sheet to mount before positioning the wheel.
-    queueMicrotask(() => this.jumpToCurrent());
+    // Double rAF so the @if branch has mounted + painted before we try
+    // to set scrollTop. queueMicrotask fires too early — ViewChild is
+    // still undefined.
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => this.jumpToCurrent()));
   }
 
   protected cancel(): void {
