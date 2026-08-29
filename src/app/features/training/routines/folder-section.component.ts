@@ -18,9 +18,11 @@ import { RoutineCardComponent } from './routine-card.component';
  * `folder` is set — the loose bucket has no ellipsis because there's no
  * folder to rename or delete. Actions delegate to TrainingActionsService.
  *
- * Collapse state is a per-instance signal — no persistence yet. Recovering
- * "which folders were collapsed last time" lands when it becomes a real
- * user complaint.
+ * Collapse state is a per-instance signal — not persisted. See memory note
+ * "folder-collapsed-persistence" for the design decision: attempted backend
+ * persistence, reverted because a PUT per toggle is wrong for cosmetic UI
+ * state; the right home is Capacitor Preferences (device-local, survives
+ * cold starts and reboots) when we add mobile persistence infra.
  */
 @Component({
   selector: 'training-folder-section',
