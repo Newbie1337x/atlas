@@ -1,24 +1,28 @@
-import { ChangeDetectionStrategy, Component, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, ViewChild, computed, input, output, signal } from '@angular/core';
 import {
   IonItem, IonLabel, IonIcon,
-  IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton,
-  IonPicker, IonPickerColumn, IonPickerColumnOption,
+  IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonContent,
+  IonList,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { stopwatchOutline } from 'ionicons/icons';
+import { stopwatchOutline, checkmark } from 'ionicons/icons';
 import { REST_OPTIONS, formatRestSeconds } from './rest-values';
 
 /**
- * Rest-duration picker. Renders as an ion-item that reads "Descanso: 1min 30s"
- * (or "Apagado" when the value is 0/null). Tapping it opens a bottom-sheet
- * modal containing a scroll-wheel with a curated list of durations.
+ * Rest-duration picker. The trigger row reads "Descanso: 1min 30s" and
+ * opens a bottom-sheet with a scrollable list of curated durations. The
+ * current value gets a checkmark; tapping any row commits it and closes
+ * the sheet.
  *
- * Reusable — same picker is needed by the session tracker (Slice 4) where
- * the user overrides the routine's default rest per set. Kept as its own
- * component so wire-up is one line at every call site.
+ * Not a wheel picker — <ion-picker> in Ionic 9 has layout quirks inside
+ * a breakpoint modal that we could not chase down inside our time
+ * budget. A tap-to-pick list is more reliable and equally clear. The
+ * component API stays the same either way, so swapping to a wheel later
+ * touches only this file.
  *
- * Two-way-ish contract: takes `value` (nullable seconds), emits
- * `valueChange` on pick. 0 is emitted as null so callers do not need to
+ * Reusable — the session tracker (Slice 4) drops it in for per-set rest
+ * overrides. Two-way-ish contract: takes `value` (nullable seconds),
+ * emits `valueChange` on pick; 0 is emitted as null so callers do not
  * treat "Apagado" as a special number.
  */
 @Component({
@@ -27,21 +31,23 @@ import { REST_OPTIONS, formatRestSeconds } from './rest-values';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     IonItem, IonLabel, IonIcon,
-    IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton,
-    IonPicker, IonPickerColumn, IonPickerColumnOption,
+    IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonContent,
+    IonList,
   ],
   styles: [`
-    /* Picker column collapses when nested in ion-content inside a
-       breakpoint-based ion-modal, so we let it sit as a direct sibling
-       of ion-header. Reserving a min height keeps the wheel visible
-       even when the modal grows/shrinks with the breakpoint drag. */
-    ion-picker {
-      min-height: 216px;
-      display: block;
+    .opt {
+      --min-height: 44px;
+    }
+    .opt.selected {
+      --background: var(--ion-color-primary-tint, rgba(56, 128, 255, 0.08));
+      font-weight: 600;
+    }
+    .check {
+      color: var(--ion-color-primary, #3880ff);
     }
   `],
   template: `
-    <ion-item button [detail]="false" (click)="open.set(true)">
+    <ion-item button [detail]="false" (click)="open()">
       <ion-icon slot="start" name="stopwatch-outline" aria-hidden="true" />
       <ion-label>
         <h3>Descanso</h3>
@@ -50,30 +56,37 @@ import { REST_OPTIONS, formatRestSeconds } from './rest-values';
     </ion-item>
 
     <ion-modal
-      [isOpen]="open()"
-      [initialBreakpoint]="0.5"
-      [breakpoints]="[0, 0.5]"
-      (ionModalDidDismiss)="open.set(false)">
+      #modal
+      [isOpen]="isOpen()"
+      [initialBreakpoint]="0.6"
+      [breakpoints]="[0, 0.6, 1]"
+      (ionModalDidDismiss)="isOpen.set(false)">
       <ng-template>
         <ion-header>
           <ion-toolbar>
             <ion-title>Descanso</ion-title>
             <ion-buttons slot="end">
-              <ion-button (click)="open.set(false)">Listo</ion-button>
+              <ion-button (click)="close()">Cerrar</ion-button>
             </ion-buttons>
           </ion-toolbar>
         </ion-header>
-        <ion-picker>
-          <ion-picker-column
-            [value]="pickerValue()"
-            (ionChange)="onPick($event)">
+        <ion-content>
+          <ion-list>
             @for (opt of options; track opt) {
-              <ion-picker-column-option [value]="opt">
-                {{ format(opt) }}
-              </ion-picker-column-option>
+              <ion-item
+                button
+                [detail]="false"
+                class="opt"
+                [class.selected]="opt === (value() ?? 0)"
+                (click)="pick(opt)">
+                <ion-label>{{ format(opt) }}</ion-label>
+                @if (opt === (value() ?? 0)) {
+                  <ion-icon slot="end" name="checkmark" class="check" aria-hidden="true" />
+                }
+              </ion-item>
             }
-          </ion-picker-column>
-        </ion-picker>
+          </ion-list>
+        </ion-content>
       </ng-template>
     </ion-modal>
   `,
@@ -81,31 +94,31 @@ import { REST_OPTIONS, formatRestSeconds } from './rest-values';
 export class RestPickerComponent {
   /** Current value in seconds. `null` = APAGADO. */
   readonly value = input<number | null>(null);
-  /** Emitted whenever the wheel lands on a new value. 0 comes out as null. */
+  /** Emitted whenever the user picks a duration. 0 comes out as null. */
   readonly valueChange = output<number | null>();
 
-  protected readonly open = signal(false);
+  @ViewChild('modal') private modalRef?: { dismiss: () => Promise<unknown> };
+
+  protected readonly isOpen = signal(false);
   protected readonly options = REST_OPTIONS;
 
+  protected readonly label = computed(() => formatRestSeconds(this.value()));
+
   constructor() {
-    addIcons({ 'stopwatch-outline': stopwatchOutline });
+    addIcons({ 'stopwatch-outline': stopwatchOutline, checkmark });
   }
 
-  /** Text under the label — "1min 30s" / "45s" / "Apagado". */
-  protected label(): string {
-    return formatRestSeconds(this.value());
+  protected open(): void {
+    this.isOpen.set(true);
   }
 
-  /** The picker column needs a real number; treat null as 0 (Apagado). */
-  protected pickerValue(): number {
-    return this.value() ?? 0;
+  protected close(): void {
+    this.isOpen.set(false);
   }
 
-  protected onPick(ev: Event): void {
-    const detail = (ev as CustomEvent<{ value?: unknown }>).detail;
-    const raw = detail?.value;
-    const seconds = typeof raw === 'number' ? raw : Number(raw ?? 0);
+  protected pick(seconds: number): void {
     this.valueChange.emit(seconds === 0 ? null : seconds);
+    this.close();
   }
 
   protected format(s: number): string {
