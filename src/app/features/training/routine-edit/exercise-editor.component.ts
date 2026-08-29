@@ -65,7 +65,17 @@ import { ReorderExercisesModalComponent } from './reorder-exercises-modal.compon
   template: `
     <ion-card>
       <ion-card-header>
-        <div class="header">
+        <!-- Header doubles as long-press target for the actions menu.
+             Interactive children (the ⋮ button) still get their own tap
+             because we only fire from the div's pointer stream and cancel
+             on movement / early release. -->
+        <div
+          class="header"
+          (pointerdown)="onHeaderPointerDown($event)"
+          (pointerup)="cancelLongPress()"
+          (pointercancel)="cancelLongPress()"
+          (pointerleave)="cancelLongPress()"
+          (pointermove)="onHeaderPointerMove($event)">
           <training-exercise-icon [name]="exercise().exerciseName" size="small" />
           <ion-card-title>
             {{ (index() + 1) + '. ' + (exercise().exerciseName ?? 'Ejercicio #' + exercise().exerciseId) }}
@@ -133,6 +143,41 @@ export class ExerciseEditorComponent {
     if (raw == null || raw === '') return null;
     const n = Number(raw);
     return Number.isFinite(n) ? n : null;
+  }
+
+  // ---------- Long-press on header → same ActionSheet ----------
+
+  /** Hold duration before the menu opens, mirrors the reorder modal. */
+  private static readonly LONG_PRESS_MS = 500;
+  /** Any pointer movement past this cancels the hold — user is scrolling. */
+  private static readonly LONG_PRESS_SLOP_PX = 8;
+
+  private longPressTimer: ReturnType<typeof setTimeout> | null = null;
+  private longPressStart: { x: number; y: number } | null = null;
+
+  protected onHeaderPointerDown(ev: PointerEvent): void {
+    this.longPressStart = { x: ev.clientX, y: ev.clientY };
+    this.longPressTimer = setTimeout(() => {
+      this.longPressTimer = null;
+      this.openMenu();
+    }, ExerciseEditorComponent.LONG_PRESS_MS);
+  }
+
+  protected onHeaderPointerMove(ev: PointerEvent): void {
+    if (!this.longPressStart) return;
+    const dx = ev.clientX - this.longPressStart.x;
+    const dy = ev.clientY - this.longPressStart.y;
+    if (dx * dx + dy * dy > ExerciseEditorComponent.LONG_PRESS_SLOP_PX ** 2) {
+      this.cancelLongPress();
+    }
+  }
+
+  protected cancelLongPress(): void {
+    if (this.longPressTimer) {
+      clearTimeout(this.longPressTimer);
+      this.longPressTimer = null;
+    }
+    this.longPressStart = null;
   }
 
   protected async openMenu(): Promise<void> {
