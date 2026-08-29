@@ -11,6 +11,7 @@ import { close } from 'ionicons/icons';
 import { TrainingApi } from '@core/training/training.api';
 import { trainingKeys } from '@core/training/training.keys';
 import { CatalogExercise } from '@core/training/exercise.model';
+import { ExerciseIconComponent } from '../shared/exercise-icon.component';
 
 /**
  * Full-screen IonModal for picking an exercise from the tenant's catalog.
@@ -30,6 +31,7 @@ import { CatalogExercise } from '@core/training/exercise.model';
   imports: [
     IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon,
     IonContent, IonSearchbar, IonList, IonItem, IonLabel, IonNote, IonSpinner,
+    ExerciseIconComponent,
   ],
   template: `
     <ion-header>
@@ -61,6 +63,7 @@ import { CatalogExercise } from '@core/training/exercise.model';
         <ion-list>
           @for (ex of filtered(); track ex.id) {
             <ion-item button (click)="dismiss(ex)">
+              <training-exercise-icon slot="start" [name]="ex.name" size="small" />
               <ion-label>
                 <h3>{{ ex.name }}</h3>
                 @if (ex.primaryMuscles.length) {

@@ -9,6 +9,7 @@ import { addOutline, trashOutline, reorderThree } from 'ionicons/icons';
 import { RoutineExercise, RoutineSet } from '@core/training/routine.model';
 import { RoutineEditFormService } from './routine-edit-form.service';
 import { SetEditorComponent } from './set-editor.component';
+import { ExerciseIconComponent } from '../shared/exercise-icon.component';
 
 /**
  * One exercise inside the routine editor. Renders the exercise header
@@ -26,7 +27,7 @@ import { SetEditorComponent } from './set-editor.component';
     FormsModule,
     IonCard, IonCardHeader, IonCardTitle, IonCardContent,
     IonButton, IonIcon, IonInput, IonReorder,
-    SetEditorComponent,
+    SetEditorComponent, ExerciseIconComponent,
   ],
   styles: [`
     .header {
@@ -62,6 +63,7 @@ import { SetEditorComponent } from './set-editor.component';
       <ion-card-header>
         <div class="header">
           <ion-reorder />
+          <training-exercise-icon [name]="exercise().exerciseName" size="small" />
           <ion-card-title>
             {{ (index() + 1) + '. ' + (exercise().exerciseName ?? 'Ejercicio #' + exercise().exerciseId) }}
           </ion-card-title>

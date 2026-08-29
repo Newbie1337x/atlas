@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { IonList, IonItem, IonLabel, IonNote } from '@ionic/angular';
 import { RoutineExercise } from '@core/training/routine.model';
+import { ExerciseIconComponent } from '../shared/exercise-icon.component';
 
 /**
  * Read-only render of a routine's exercises + sets. Skinless — plays the
@@ -15,7 +16,7 @@ import { RoutineExercise } from '@core/training/routine.model';
   selector: 'training-routine-exercise-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IonList, IonItem, IonLabel, IonNote],
+  imports: [IonList, IonItem, IonLabel, IonNote, ExerciseIconComponent],
   styles: [`
     .ex-header {
       display: flex;
@@ -39,6 +40,7 @@ import { RoutineExercise } from '@core/training/routine.model';
       <ion-list>
         @for (ex of exercises(); track ex.id) {
           <ion-item lines="full">
+            <training-exercise-icon slot="start" [name]="ex.exerciseName" size="small" />
             <ion-label>
               <div class="ex-header">
                 <h3>{{ ex.orderIndex + 1 }}. {{ ex.exerciseName ?? 'Ejercicio #' + ex.exerciseId }}</h3>
