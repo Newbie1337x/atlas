@@ -2,52 +2,97 @@ import {
   ChangeDetectionStrategy, Component, ElementRef, ViewChild,
   computed, effect, input, output, signal,
 } from '@angular/core';
-import {
-  IonItem, IonLabel, IonIcon,
-  IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton,
-} from '@ionic/angular';
+import { IonItem, IonLabel, IonIcon } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { stopwatchOutline } from 'ionicons/icons';
 import { REST_OPTIONS, formatRestSeconds } from './rest-values';
 
 /**
- * Rest-duration picker as a native-feeling scroll wheel.
+ * Rest-duration picker. Trigger row + a custom bottom-sheet overlay
+ * (own div + backdrop, no ion-modal). Two IonModal iterations died to
+ * layout quirks in Ionic 9 — the overlay is fully controlled: fixed
+ * 50vh sheet at the bottom, no vertical drag expansion, backdrop
+ * closes, Listo commits.
  *
- * <ion-picker> in Ionic 9 does not render its wheel inside a
- * breakpoint modal (only the header shows). PickerController was
- * removed in v9. Rather than a plain list, we build the wheel with
- * CSS scroll-snap + a top/bottom fade mask. Real touch scroll physics,
- * one file, no framework fight.
+ * Wheel is CSS scroll-snap. 5s uniform grain. Real touch scroll
+ * physics via native overflow-y:scroll + scroll-snap. The row snapped
+ * to the middle is the "draft"; grows + tints on center-hover.
  *
- * Interaction:
- *   - Tap the trigger row → opens the sheet.
- *   - Drag the wheel with the finger — item snapped to the middle
- *     row is the "selected" one (larger, tinted).
- *   - Tap Listo → emits the current selection and closes.
- *
- * Two-way contract: `value` in (nullable seconds), `valueChange` out
- * (0 becomes null). Reusable — session tracker in Slice 4 drops it in
- * for per-set rest overrides.
+ * Contract: `value` in (nullable seconds), `valueChange` out — 0
+ * comes out as null. Reusable — the session tracker in Slice 4 drops
+ * it in for per-set rest overrides.
  */
 @Component({
   selector: 'training-rest-picker',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    IonItem, IonLabel, IonIcon,
-    IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton,
-  ],
+  imports: [IonItem, IonLabel, IonIcon],
   styles: [`
-    /* Wheel geometry: each row 44px, wheel 5 rows tall so 2 fade above
-       + selected + 2 fade below. Padding above/below equals 2 rows so
-       the first/last items can center in the highlight strip. */
+    /* --- Overlay + sheet --- */
+    .backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      animation: fade-in 180ms ease-out;
+    }
+    .sheet {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 50vh;
+      max-height: 440px;
+      z-index: 1001;
+      background: var(--ion-background-color, #1c1c1e);
+      border-radius: 16px 16px 0 0;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+      animation: slide-up 220ms cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .grabber {
+      align-self: center;
+      width: 36px;
+      height: 4px;
+      background: var(--ion-color-step-300, rgba(255, 255, 255, 0.25));
+      border-radius: 2px;
+      margin: 8px 0 4px;
+    }
+    .sheet-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--ion-color-step-150, rgba(255, 255, 255, 0.08));
+    }
+    .sheet-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--ion-text-color, #fff);
+    }
+    .listo-btn {
+      background: none;
+      border: 0;
+      padding: 4px 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--ion-color-primary, #3880ff);
+      cursor: pointer;
+    }
+    /* --- Wheel --- */
     .wheel-shell {
       position: relative;
-      padding: 8px 0 24px;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
     }
     .wheel {
       position: relative;
-      height: 220px;                /* 5 × 44px */
+      width: 100%;
+      height: 100%;
       overflow-y: scroll;
       scroll-snap-type: y mandatory;
       scrollbar-width: none;
@@ -58,7 +103,9 @@ import { REST_OPTIONS, formatRestSeconds } from './rest-values';
     }
     .wheel::-webkit-scrollbar { display: none; }
     .wheel-inner {
-      padding-block: 88px;          /* 2 × 44px so first/last snap to center */
+      /* Padding so first / last items can center in the highlight strip.
+         Computed from the sheet's inner-half minus one item-half. */
+      padding-block: calc(50% - 22px);
     }
     .wheel-item {
       height: 44px;
@@ -75,17 +122,24 @@ import { REST_OPTIONS, formatRestSeconds } from './rest-values';
       font-size: 1.35rem;
       font-weight: 600;
     }
-    /* Center highlight bar — pointer-events off so it does not steal drag. */
     .wheel-highlight {
       position: absolute;
       top: 50%;
-      left: 12px;
-      right: 12px;
+      left: 16px;
+      right: 16px;
       height: 44px;
       transform: translateY(-50%);
-      border-top: 1px solid var(--ion-color-step-200, rgba(255, 255, 255, 0.1));
-      border-bottom: 1px solid var(--ion-color-step-200, rgba(255, 255, 255, 0.1));
+      border-top: 1px solid var(--ion-color-step-200, rgba(255, 255, 255, 0.12));
+      border-bottom: 1px solid var(--ion-color-step-200, rgba(255, 255, 255, 0.12));
       pointer-events: none;
+    }
+    @keyframes fade-in {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    @keyframes slide-up {
+      from { transform: translateY(100%); }
+      to   { transform: translateY(0); }
     }
   `],
   template: `
@@ -97,22 +151,14 @@ import { REST_OPTIONS, formatRestSeconds } from './rest-values';
       </ion-label>
     </ion-item>
 
-    <ion-modal
-      [isOpen]="isOpen()"
-      [initialBreakpoint]="0.5"
-      [breakpoints]="[0, 0.5]"
-      (ionModalDidPresent)="onPresented()"
-      (ionModalDidDismiss)="isOpen.set(false)">
-      <ng-template>
-        <ion-header>
-          <ion-toolbar>
-            <ion-title>Descanso</ion-title>
-            <ion-buttons slot="end">
-              <ion-button (click)="commit()">Listo</ion-button>
-            </ion-buttons>
-          </ion-toolbar>
-        </ion-header>
-
+    @if (isOpen()) {
+      <div class="backdrop" (click)="cancel()" aria-hidden="true"></div>
+      <div class="sheet" role="dialog" aria-label="Elegir descanso">
+        <div class="grabber" (click)="cancel()"></div>
+        <div class="sheet-header">
+          <span class="sheet-title">Descanso</span>
+          <button type="button" class="listo-btn" (click)="commit()">Listo</button>
+        </div>
         <div class="wheel-shell">
           <div #wheelEl class="wheel" (scroll)="onScroll()">
             <div class="wheel-inner">
@@ -125,8 +171,8 @@ import { REST_OPTIONS, formatRestSeconds } from './rest-values';
           </div>
           <div class="wheel-highlight" aria-hidden="true"></div>
         </div>
-      </ng-template>
-    </ion-modal>
+      </div>
+    }
   `,
 })
 export class RestPickerComponent {
@@ -139,7 +185,7 @@ export class RestPickerComponent {
 
   protected readonly isOpen = signal(false);
   protected readonly options = REST_OPTIONS;
-  /** Value currently under the highlight bar — updated on scroll. */
+  /** Value under the highlight strip — updated on scroll. */
   protected readonly draft = signal<number>(0);
 
   protected readonly label = computed(() => formatRestSeconds(this.value()));
@@ -147,17 +193,28 @@ export class RestPickerComponent {
   constructor() {
     addIcons({ 'stopwatch-outline': stopwatchOutline });
     // Seed the draft from the input whenever it changes so re-opening
-    // the modal starts at the persisted value.
+    // starts at the persisted value.
     effect(() => this.draft.set(this.value() ?? 0));
   }
 
   protected open(): void {
     this.isOpen.set(true);
+    // Wait for the sheet to mount before positioning the wheel.
+    queueMicrotask(() => this.jumpToCurrent());
   }
 
-  /** After the modal is presented, jump the wheel to the current value
-   *  without animating (the user has not touched anything yet). */
-  protected onPresented(): void {
+  protected cancel(): void {
+    // Backdrop / grabber tap — discard draft, keep prior value.
+    this.isOpen.set(false);
+  }
+
+  protected commit(): void {
+    const s = this.draft();
+    this.valueChange.emit(s === 0 ? null : s);
+    this.isOpen.set(false);
+  }
+
+  private jumpToCurrent(): void {
     const el = this.wheelEl?.nativeElement;
     if (!el) return;
     const idx = Math.max(0, this.options.indexOf(this.value() ?? 0));
@@ -171,12 +228,6 @@ export class RestPickerComponent {
     const clamped = Math.max(0, Math.min(this.options.length - 1, idx));
     const val = this.options[clamped];
     if (val !== this.draft()) this.draft.set(val);
-  }
-
-  protected commit(): void {
-    const s = this.draft();
-    this.valueChange.emit(s === 0 ? null : s);
-    this.isOpen.set(false);
   }
 
   protected format(s: number): string {
