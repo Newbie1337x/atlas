@@ -2,89 +2,48 @@ import {
   ChangeDetectionStrategy, Component, ElementRef, ViewChild,
   computed, effect, input, output, signal,
 } from '@angular/core';
-import { IonItem, IonLabel, IonIcon } from '@ionic/angular';
+import {
+  IonItem, IonLabel, IonIcon,
+  IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonContent,
+} from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { stopwatchOutline } from 'ionicons/icons';
 import { REST_OPTIONS, formatRestSeconds } from './rest-values';
 
 /**
- * Rest-duration picker. Trigger row + a custom bottom-sheet overlay
- * (own div + backdrop, no ion-modal). Two IonModal iterations died to
- * layout quirks in Ionic 9 — the overlay is fully controlled: fixed
- * 50vh sheet at the bottom, no vertical drag expansion, backdrop
- * closes, Listo commits.
+ * Rest-duration picker: trigger row + bottom-sheet with a CSS scroll-snap
+ * wheel.
  *
- * Wheel is CSS scroll-snap. 5s uniform grain. Real touch scroll
- * physics via native overflow-y:scroll + scroll-snap. The row snapped
- * to the middle is the "draft"; grows + tints on center-hover.
+ * Uses ion-modal for the sheet because ion-modal automatically portals
+ * itself to document.body — a custom `position: fixed` div was getting
+ * clipped by a transformed ancestor (ion-router-outlet / ion-card use
+ * transforms, which create a containing block for `position: fixed`
+ * descendants). ion-picker was skipped this time — it does not render
+ * inside a breakpoint modal in Ionic 9; a plain CSS wheel behaves
+ * identically without fighting the framework.
  *
- * Contract: `value` in (nullable seconds), `valueChange` out — 0
- * comes out as null. Reusable — the session tracker in Slice 4 drops
- * it in for per-set rest overrides.
+ * Contract: `value` in (nullable seconds), `valueChange` out (0 emitted
+ * as null). Reusable — the session tracker in Slice 4 drops it in for
+ * per-set rest overrides.
  */
 @Component({
   selector: 'training-rest-picker',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IonItem, IonLabel, IonIcon],
+  imports: [
+    IonItem, IonLabel, IonIcon,
+    IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonContent,
+  ],
   styles: [`
-    /* --- Overlay + sheet --- */
-    .backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.5);
-      z-index: 1000;
-      animation: fade-in 180ms ease-out;
+    /* Sheet sizing. ion-modal supports --height on the shadow host. */
+    ion-modal {
+      --height: auto;
+      --border-radius: 16px 16px 0 0;
     }
-    .sheet {
-      position: fixed;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      height: auto;
-      z-index: 1001;
-      background: var(--ion-background-color, #1c1c1e);
-      border-radius: 16px 16px 0 0;
-      display: flex;
-      flex-direction: column;
-      box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
-      animation: slide-up 220ms cubic-bezier(0.32, 0.72, 0, 1);
-    }
-    .grabber {
-      align-self: center;
-      width: 36px;
-      height: 4px;
-      background: var(--ion-color-step-300, rgba(255, 255, 255, 0.25));
-      border-radius: 2px;
-      margin: 8px 0 4px;
-    }
-    .sheet-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 16px;
-      border-bottom: 1px solid var(--ion-color-step-150, rgba(255, 255, 255, 0.08));
-    }
-    .sheet-title {
-      font-size: 1rem;
-      font-weight: 600;
-      color: var(--ion-text-color, #fff);
-    }
-    .listo-btn {
-      background: none;
-      border: 0;
-      padding: 4px 8px;
-      font-size: 1rem;
-      font-weight: 600;
-      color: var(--ion-color-primary, #3880ff);
-      cursor: pointer;
-    }
-    /* --- Wheel --- */
+    /* Wheel geometry — 6 rows × 44px so we get 3 above + selected + 2 below. */
     .wheel-shell {
       position: relative;
-      /* Fixed height so scroll-snap math is deterministic and padding
-         can be a straight pixel value. */
-      height: 264px;                /* 6 rows × 44px */
+      height: 264px;
       overflow: hidden;
     }
     .wheel {
@@ -101,8 +60,7 @@ import { REST_OPTIONS, formatRestSeconds } from './rest-values';
     }
     .wheel::-webkit-scrollbar { display: none; }
     .wheel-inner {
-      /* Padding so first / last items can center in the highlight strip:
-         (wheel-shell 264 - item 44) / 2 = 110. */
+      /* (264 wheel - 44 item) / 2 = 110px so first/last items can center. */
       padding-block: 110px;
     }
     .wheel-item {
@@ -131,17 +89,9 @@ import { REST_OPTIONS, formatRestSeconds } from './rest-values';
       border-bottom: 1px solid var(--ion-color-step-200, rgba(255, 255, 255, 0.12));
       pointer-events: none;
     }
-    @keyframes fade-in {
-      from { opacity: 0; }
-      to   { opacity: 1; }
-    }
-    @keyframes slide-up {
-      from { transform: translateY(100%); }
-      to   { transform: translateY(0); }
-    }
   `],
   template: `
-    <ion-item button [detail]="false" (click)="open()">
+    <ion-item button [detail]="false" (click)="isOpen.set(true)">
       <ion-icon slot="start" name="stopwatch-outline" aria-hidden="true" />
       <ion-label>
         <h3>Descanso</h3>
@@ -149,28 +99,37 @@ import { REST_OPTIONS, formatRestSeconds } from './rest-values';
       </ion-label>
     </ion-item>
 
-    @if (isOpen()) {
-      <div class="backdrop" (click)="cancel()" aria-hidden="true"></div>
-      <div class="sheet" role="dialog" aria-label="Elegir descanso">
-        <div class="grabber" (click)="cancel()"></div>
-        <div class="sheet-header">
-          <span class="sheet-title">Descanso</span>
-          <button type="button" class="listo-btn" (click)="commit()">Listo</button>
-        </div>
-        <div class="wheel-shell">
-          <div #wheelEl class="wheel" (scroll)="onScroll()">
-            <div class="wheel-inner">
-              @for (opt of options; track opt) {
-                <div class="wheel-item" [class.selected]="opt === draft()">
-                  {{ format(opt) }}
-                </div>
-              }
+    <ion-modal
+      [isOpen]="isOpen()"
+      [initialBreakpoint]="0.55"
+      [breakpoints]="[0, 0.55]"
+      (ionModalDidPresent)="onPresented()"
+      (ionModalDidDismiss)="isOpen.set(false)">
+      <ng-template>
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Descanso</ion-title>
+            <ion-buttons slot="end">
+              <ion-button (click)="commit()">Listo</ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="ion-no-padding">
+          <div class="wheel-shell">
+            <div #wheelEl class="wheel" (scroll)="onScroll()">
+              <div class="wheel-inner">
+                @for (opt of options; track opt) {
+                  <div class="wheel-item" [class.selected]="opt === draft()">
+                    {{ format(opt) }}
+                  </div>
+                }
+              </div>
             </div>
+            <div class="wheel-highlight" aria-hidden="true"></div>
           </div>
-          <div class="wheel-highlight" aria-hidden="true"></div>
-        </div>
-      </div>
-    }
+        </ion-content>
+      </ng-template>
+    </ion-modal>
   `,
 })
 export class RestPickerComponent {
@@ -183,39 +142,20 @@ export class RestPickerComponent {
 
   protected readonly isOpen = signal(false);
   protected readonly options = REST_OPTIONS;
-  /** Value under the highlight strip — updated on scroll. */
+  /** Value snapped to the center — updated on scroll. */
   protected readonly draft = signal<number>(0);
 
   protected readonly label = computed(() => formatRestSeconds(this.value()));
 
   constructor() {
     addIcons({ 'stopwatch-outline': stopwatchOutline });
-    // Seed the draft from the input whenever it changes so re-opening
-    // starts at the persisted value.
+    // Seed draft from input every time it changes so re-opening starts
+    // at the persisted value.
     effect(() => this.draft.set(this.value() ?? 0));
   }
 
-  protected open(): void {
-    this.isOpen.set(true);
-    // Double rAF so the @if branch has mounted + painted before we try
-    // to set scrollTop. queueMicrotask fires too early — ViewChild is
-    // still undefined.
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => this.jumpToCurrent()));
-  }
-
-  protected cancel(): void {
-    // Backdrop / grabber tap — discard draft, keep prior value.
-    this.isOpen.set(false);
-  }
-
-  protected commit(): void {
-    const s = this.draft();
-    this.valueChange.emit(s === 0 ? null : s);
-    this.isOpen.set(false);
-  }
-
-  private jumpToCurrent(): void {
+  protected onPresented(): void {
+    // ion-modal has fully mounted the ng-template by the time this fires.
     const el = this.wheelEl?.nativeElement;
     if (!el) return;
     const idx = Math.max(0, this.options.indexOf(this.value() ?? 0));
@@ -229,6 +169,12 @@ export class RestPickerComponent {
     const clamped = Math.max(0, Math.min(this.options.length - 1, idx));
     const val = this.options[clamped];
     if (val !== this.draft()) this.draft.set(val);
+  }
+
+  protected commit(): void {
+    const s = this.draft();
+    this.valueChange.emit(s === 0 ? null : s);
+    this.isOpen.set(false);
   }
 
   protected format(s: number): string {
