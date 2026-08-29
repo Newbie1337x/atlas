@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, Input, inject } from '@angular/core';
 import {
   IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon,
-  IonContent, IonList, IonItem, IonLabel, IonReorderGroup,
+  IonContent, IonList, IonItem, IonLabel, IonReorderGroup, IonReorder,
   IonFooter, ModalController, ItemReorderEventDetail,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
@@ -15,12 +15,18 @@ import { ExerciseIconComponent } from '../shared/exercise-icon.component';
  * competes with the "tap to edit" affordance); this modal gives the user
  * a wide, uncluttered canvas.
  *
- * Interaction: no <ion-reorder> element inside the item on purpose —
- * that would gate dragging to only the handle area. Without it, the
- * WHOLE row is the drag target, and Ionic's built-in long-press gesture
- * (~500ms) activates the drag anywhere on the row. The trailing ≡ icon
- * is decorative only (pointer-events: none) so it does not eat the
- * touch.
+ * Interaction: content that should be draggable (icon + name + chevron)
+ * lives INSIDE an <ion-reorder> that stretches with flex:1. Ionic
+ * activates the drag on touch anywhere inside that element — the whole
+ * strip past the delete button is the drag surface. The delete button
+ * stays outside the ion-reorder wrapper so tapping it never triggers a
+ * drag by accident.
+ *
+ * Note on activation timing: Ionic's default is immediate drag on touch
+ * (no long-press). If the user reports it feels too eager (accidental
+ * reorders while scrolling), we would wrap the modal in a custom
+ * long-press gesture and only mount ion-reorder-group after the hold
+ * fires. Not needed yet.
  *
  * Reads and mutates the SAME RoutineEditFormService the page provides,
  * so changes here (reorder / delete) apply directly to the parent's draft.
@@ -33,7 +39,7 @@ import { ExerciseIconComponent } from '../shared/exercise-icon.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon,
-    IonContent, IonList, IonItem, IonLabel, IonReorderGroup,
+    IonContent, IonList, IonItem, IonLabel, IonReorderGroup, IonReorder,
     IonFooter,
     ExerciseIconComponent,
   ],
@@ -41,13 +47,21 @@ import { ExerciseIconComponent } from '../shared/exercise-icon.component';
     .remove-btn {
       margin-inline-end: 8px;
     }
-    /* Decorative — the whole row is the drag target (no <ion-reorder>
-       gating it), so the icon is just a visual affordance and does not
-       need pointer events. */
+    /* <ion-reorder> wraps the row content and stretches to fill so the
+       drag can be initiated from anywhere over the icon + name area,
+       not just a tiny handle. */
+    .drag-area {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 44px;
+    }
+    .drag-area .name {
+      flex: 1;
+    }
     .drag-hint {
       color: var(--ion-color-medium, #666);
-      pointer-events: none;
-      margin-inline-start: 12px;
     }
   `],
   template: `
@@ -74,11 +88,17 @@ import { ExerciseIconComponent } from '../shared/exercise-icon.component';
                 aria-label="Quitar ejercicio">
                 <ion-icon slot="icon-only" name="remove-circle" color="danger" />
               </ion-button>
-              <training-exercise-icon [name]="ex.exerciseName" size="small" />
-              <ion-label class="ion-padding-start">
-                {{ ex.exerciseName ?? 'Ejercicio #' + ex.exerciseId }}
-              </ion-label>
-              <ion-icon slot="end" name="reorder-three" class="drag-hint" aria-hidden="true" />
+
+              <!-- Everything inside ion-reorder becomes a drag target
+                   (icon, name, chevron). Drag activates on touch anywhere
+                   in that area. -->
+              <ion-reorder class="drag-area">
+                <training-exercise-icon [name]="ex.exerciseName" size="small" />
+                <ion-label class="name">
+                  {{ ex.exerciseName ?? 'Ejercicio #' + ex.exerciseId }}
+                </ion-label>
+                <ion-icon name="reorder-three" class="drag-hint" aria-hidden="true" />
+              </ion-reorder>
             </ion-item>
           }
         </ion-reorder-group>
