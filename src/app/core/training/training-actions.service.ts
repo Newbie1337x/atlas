@@ -53,6 +53,18 @@ export class TrainingActionsService {
     await this.invalidate();
   }
 
+  /**
+   * Toggle the persisted collapsed state. Fire-and-forget from the UI's
+   * perspective — the caller flips the local signal optimistically for
+   * instant feedback; this method just tells the backend + refreshes the
+   * folder list so other views agree. On error the next invalidation
+   * snap-restores the true value from the server.
+   */
+  async toggleFolderCollapsed(folder: RoutineFolder): Promise<void> {
+    await firstValueFrom(this.api.updateFolder(folder.id, { collapsed: !folder.collapsed }));
+    await this.invalidate();
+  }
+
   async confirmDeleteFolder(folder: RoutineFolder): Promise<void> {
     const ok = await this.confirm({
       header: 'Borrar carpeta',

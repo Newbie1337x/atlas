@@ -13,16 +13,19 @@ export interface RoutineFolder {
   ownerGlobalProfileId: number;
   name: string;
   displayOrder: number;
+  /** UI-only flag persisted per-account so it survives device switches. */
+  collapsed: boolean;
   createdAt: string;
   /** Populated by the backend enricher — number of routines currently in the folder. */
   routineCount: number;
 }
 
 /**
- * Payload for POST/PUT of a routine folder. Both fields optional on PUT
+ * Payload for POST/PUT of a routine folder. All fields optional on PUT
  * (null = leave as-is). POST requires a non-blank name (backend guard).
  */
 export interface RoutineFolderRequest {
   name?: string;
   displayOrder?: number;
+  collapsed?: boolean;
 }
