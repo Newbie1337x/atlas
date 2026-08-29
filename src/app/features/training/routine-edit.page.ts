@@ -6,8 +6,7 @@ import { injectQuery, injectQueryClient } from '@tanstack/angular-query-experime
 import {
   IonHeader, IonToolbar, IonTitle, IonButtons, IonBackButton, IonButton,
   IonContent, IonInput, IonNote, IonSpinner, IonIcon,
-  IonReorderGroup, IonItemGroup,
-  ModalController, ItemReorderEventDetail,
+  ModalController,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { addOutline, checkmarkOutline } from 'ionicons/icons';
@@ -43,7 +42,6 @@ import { ExercisePickerComponent } from './routine-edit/exercise-picker.componen
     FormsModule,
     IonHeader, IonToolbar, IonTitle, IonButtons, IonBackButton, IonButton,
     IonContent, IonInput, IonNote, IonSpinner, IonIcon,
-    IonReorderGroup, IonItemGroup,
     ExerciseEditorComponent,
   ],
   template: `
@@ -83,13 +81,9 @@ import { ExercisePickerComponent } from './routine-edit/exercise-picker.componen
           [ngModel]="d.notes"
           (ngModelChange)="form.updateNotes($event)" />
 
-        <ion-item-group>
-          <ion-reorder-group [disabled]="false" (ionItemReorder)="onReorder($event)">
-            @for (ex of d.exercises; track $index) {
-              <training-exercise-editor [exercise]="ex" [index]="$index" />
-            }
-          </ion-reorder-group>
-        </ion-item-group>
+        @for (ex of d.exercises; track $index) {
+          <training-exercise-editor [exercise]="ex" [index]="$index" />
+        }
 
         <ion-button expand="block" fill="outline" (click)="openPicker()">
           <ion-icon slot="start" name="add-outline" />
@@ -129,11 +123,6 @@ export class RoutineEditPage {
       const data = this.query.data();
       if (data) this.form.loadFrom(data);
     });
-  }
-
-  protected onReorder(ev: CustomEvent<ItemReorderEventDetail>): void {
-    this.form.moveExercise(ev.detail.from, ev.detail.to);
-    ev.detail.complete();
   }
 
   protected async openPicker(): Promise<void> {

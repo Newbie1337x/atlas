@@ -2,22 +2,26 @@ import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core
 import { FormsModule } from '@angular/forms';
 import {
   IonCard, IonCardHeader, IonCardTitle, IonCardContent,
-  IonButton, IonIcon, IonInput, IonReorder,
+  IonButton, IonIcon, IonInput,
+  ActionSheetController, AlertController, ModalController, ToastController,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { addOutline, trashOutline, reorderThree } from 'ionicons/icons';
-import { RoutineExercise, RoutineSet } from '@core/training/routine.model';
+import { addOutline, ellipsisVertical } from 'ionicons/icons';
+import { RoutineExercise } from '@core/training/routine.model';
 import { RoutineEditFormService } from './routine-edit-form.service';
 import { SetEditorComponent } from './set-editor.component';
 import { ExerciseIconComponent } from '../shared/exercise-icon.component';
+import { ReorderExercisesModalComponent } from './reorder-exercises-modal.component';
 
 /**
- * One exercise inside the routine editor. Renders the exercise header
- * (name + drag handle + remove button), inline inputs for rest / notes,
- * a stack of set editors, and an "add set" button.
+ * One exercise inside the routine editor. Header shows the name + a single
+ * ellipsis (⋮) button that opens an ActionSheet with every per-exercise
+ * action (Hevy pattern): reorder — replace — superset — delete. The old
+ * inline drag handle + trash icon were removed because on a phone the
+ * small tap targets competed with the tap-to-edit affordance of the card.
  *
  * Delegates every mutation to the form service by index. Never mutates
- * the input directly — the input is a signal-derived view.
+ * the exercise input directly.
  */
 @Component({
   selector: 'training-exercise-editor',
@@ -26,7 +30,7 @@ import { ExerciseIconComponent } from '../shared/exercise-icon.component';
   imports: [
     FormsModule,
     IonCard, IonCardHeader, IonCardTitle, IonCardContent,
-    IonButton, IonIcon, IonInput, IonReorder,
+    IonButton, IonIcon, IonInput,
     SetEditorComponent, ExerciseIconComponent,
   ],
   styles: [`
@@ -62,13 +66,12 @@ import { ExerciseIconComponent } from '../shared/exercise-icon.component';
     <ion-card>
       <ion-card-header>
         <div class="header">
-          <ion-reorder />
           <training-exercise-icon [name]="exercise().exerciseName" size="small" />
           <ion-card-title>
             {{ (index() + 1) + '. ' + (exercise().exerciseName ?? 'Ejercicio #' + exercise().exerciseId) }}
           </ion-card-title>
-          <ion-button fill="clear" size="small" (click)="form.removeExercise(index())" aria-label="Quitar ejercicio">
-            <ion-icon slot="icon-only" name="trash-outline" color="danger" />
+          <ion-button fill="clear" size="small" (click)="openMenu()" aria-label="Opciones del ejercicio">
+            <ion-icon slot="icon-only" name="ellipsis-vertical" />
           </ion-button>
         </div>
       </ion-card-header>
@@ -117,14 +120,67 @@ export class ExerciseEditorComponent {
   readonly index = input.required<number>();
 
   protected readonly form = inject(RoutineEditFormService);
+  private readonly sheets = inject(ActionSheetController);
+  private readonly alerts = inject(AlertController);
+  private readonly modal = inject(ModalController);
+  private readonly toasts = inject(ToastController);
 
   constructor() {
-    addIcons({ 'add-outline': addOutline, 'trash-outline': trashOutline, 'reorder-three': reorderThree });
+    addIcons({ 'add-outline': addOutline, 'ellipsis-vertical': ellipsisVertical });
   }
 
   protected numeric(raw: unknown): number | null {
     if (raw == null || raw === '') return null;
     const n = Number(raw);
     return Number.isFinite(n) ? n : null;
+  }
+
+  protected async openMenu(): Promise<void> {
+    const ex = this.exercise();
+    const sheet = await this.sheets.create({
+      header: ex.exerciseName ?? `Ejercicio #${ex.exerciseId}`,
+      buttons: [
+        { text: 'Reordenar ejercicios',   handler: () => { this.openReorder(); } },
+        { text: 'Reemplazar ejercicio',   handler: () => { this.notImplemented('Reemplazar'); } },
+        { text: 'Agregar a superserie',   handler: () => { this.notImplemented('Superserie'); } },
+        { text: 'Eliminar ejercicio', role: 'destructive', handler: () => { this.confirmDelete(); } },
+        { text: 'Cancelar', role: 'cancel' },
+      ],
+    });
+    await sheet.present();
+  }
+
+  private async openReorder(): Promise<void> {
+    // Modal cannot inject the page-scoped form service via DI — pass it
+    // through componentProps so both sides mutate the same draft.
+    const modal = await this.modal.create({
+      component: ReorderExercisesModalComponent,
+      componentProps: { form: this.form },
+    });
+    await modal.present();
+  }
+
+  private async confirmDelete(): Promise<void> {
+    const ex = this.exercise();
+    const alert = await this.alerts.create({
+      header: 'Eliminar ejercicio',
+      message: `¿Quitar "${ex.exerciseName ?? 'este ejercicio'}" de la rutina?`,
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        { text: 'Eliminar', role: 'confirm', cssClass: 'ion-color-danger' },
+      ],
+    });
+    await alert.present();
+    const { role } = await alert.onDidDismiss();
+    if (role === 'confirm') this.form.removeExercise(this.index());
+  }
+
+  private async notImplemented(feature: string): Promise<void> {
+    const toast = await this.toasts.create({
+      message: `${feature}: próximamente`,
+      duration: 1500,
+      position: 'bottom',
+    });
+    await toast.present();
   }
 }
