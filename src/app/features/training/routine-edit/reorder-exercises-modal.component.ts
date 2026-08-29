@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, Input, inject } from '@angular/core';
 import {
   IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon,
-  IonContent, IonList, IonItem, IonLabel, IonReorderGroup, IonReorder,
+  IonContent, IonList, IonItem, IonLabel, IonReorderGroup,
   IonFooter, ModalController, ItemReorderEventDetail,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
@@ -15,6 +15,13 @@ import { ExerciseIconComponent } from '../shared/exercise-icon.component';
  * competes with the "tap to edit" affordance); this modal gives the user
  * a wide, uncluttered canvas.
  *
+ * Interaction: no <ion-reorder> element inside the item on purpose —
+ * that would gate dragging to only the handle area. Without it, the
+ * WHOLE row is the drag target, and Ionic's built-in long-press gesture
+ * (~500ms) activates the drag anywhere on the row. The trailing ≡ icon
+ * is decorative only (pointer-events: none) so it does not eat the
+ * touch.
+ *
  * Reads and mutates the SAME RoutineEditFormService the page provides,
  * so changes here (reorder / delete) apply directly to the parent's draft.
  * Closing the modal does not persist to the server — save still happens
@@ -26,13 +33,21 @@ import { ExerciseIconComponent } from '../shared/exercise-icon.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon,
-    IonContent, IonList, IonItem, IonLabel, IonReorderGroup, IonReorder,
+    IonContent, IonList, IonItem, IonLabel, IonReorderGroup,
     IonFooter,
     ExerciseIconComponent,
   ],
   styles: [`
     .remove-btn {
       margin-inline-end: 8px;
+    }
+    /* Decorative — the whole row is the drag target (no <ion-reorder>
+       gating it), so the icon is just a visual affordance and does not
+       need pointer events. */
+    .drag-hint {
+      color: var(--ion-color-medium, #666);
+      pointer-events: none;
+      margin-inline-start: 12px;
     }
   `],
   template: `
@@ -63,7 +78,7 @@ import { ExerciseIconComponent } from '../shared/exercise-icon.component';
               <ion-label class="ion-padding-start">
                 {{ ex.exerciseName ?? 'Ejercicio #' + ex.exerciseId }}
               </ion-label>
-              <ion-reorder slot="end" />
+              <ion-icon slot="end" name="reorder-three" class="drag-hint" aria-hidden="true" />
             </ion-item>
           }
         </ion-reorder-group>
