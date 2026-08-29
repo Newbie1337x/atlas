@@ -3,11 +3,12 @@ import { FormsModule } from '@angular/forms';
 import {
   IonCard, IonCardHeader, IonCardTitle, IonCardContent,
   IonButton, IonIcon, IonInput,
-  ActionSheetController, AlertController, ModalController, ToastController,
+  ActionSheetController, AlertController, ModalController,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { addOutline, ellipsisVertical } from 'ionicons/icons';
 import { RoutineExercise } from '@core/training/routine.model';
+import { TrainingActionsService } from '@core/training/training-actions.service';
 import { RoutineEditFormService } from './routine-edit-form.service';
 import { SetEditorComponent } from './set-editor.component';
 import { ExerciseIconComponent } from '../shared/exercise-icon.component';
@@ -133,7 +134,7 @@ export class ExerciseEditorComponent {
   private readonly sheets = inject(ActionSheetController);
   private readonly alerts = inject(AlertController);
   private readonly modal = inject(ModalController);
-  private readonly toasts = inject(ToastController);
+  private readonly actions = inject(TrainingActionsService);
 
   constructor() {
     addIcons({ 'add-outline': addOutline, 'ellipsis-vertical': ellipsisVertical });
@@ -188,8 +189,8 @@ export class ExerciseEditorComponent {
       header: ex.exerciseName ?? `Ejercicio #${ex.exerciseId}`,
       buttons: [
         { text: 'Reordenar ejercicios',   handler: () => { this.openReorder(); } },
-        { text: 'Reemplazar ejercicio',   handler: () => { this.notImplemented('Reemplazar'); } },
-        { text: 'Agregar a superserie',   handler: () => { this.notImplemented('Superserie'); } },
+        { text: 'Reemplazar ejercicio',   handler: () => { this.actions.notImplemented('Reemplazar'); } },
+        { text: 'Agregar a superserie',   handler: () => { this.actions.notImplemented('Superserie'); } },
         { text: 'Eliminar ejercicio', role: 'destructive', handler: () => { this.confirmDelete(); } },
         { text: 'Cancelar', role: 'cancel' },
       ],
@@ -222,12 +223,4 @@ export class ExerciseEditorComponent {
     if (role === 'confirm') this.form.removeExercise(this.index());
   }
 
-  private async notImplemented(feature: string): Promise<void> {
-    const toast = await this.toasts.create({
-      message: `${feature}: próximamente`,
-      duration: 1500,
-      position: 'bottom',
-    });
-    await toast.present();
-  }
 }

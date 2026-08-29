@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import {
   IonItem, IonLabel, IonNote, IonButton, IonIcon, ActionSheetController,
 } from '@ionic/angular';
@@ -60,6 +60,7 @@ export class RoutineCardComponent {
 
   private readonly actions = inject(TrainingActionsService);
   private readonly sheets = inject(ActionSheetController);
+  private readonly router = inject(Router);
 
   constructor() {
     addIcons({ 'ellipsis-vertical': ellipsisVertical });
@@ -77,6 +78,9 @@ export class RoutineCardComponent {
     const sheet = await this.sheets.create({
       header: r.title,
       buttons: [
+        { text: 'Compartir rutina', handler: () => { this.actions.notImplemented('Compartir'); } },
+        { text: 'Duplicar rutina',  handler: () => { this.actions.confirmCloneRoutine(r); } },
+        { text: 'Editar rutina',    handler: () => { this.router.navigate(['/training/routines', r.id, 'edit']); } },
         { text: 'Borrar rutina', role: 'destructive', handler: () => { this.actions.confirmDeleteRoutine(r); } },
         { text: 'Cancelar', role: 'cancel' },
       ],

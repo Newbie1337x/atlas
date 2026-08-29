@@ -1,11 +1,14 @@
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { AlertController } from '@ionic/angular';
+import { AlertController, ToastController } from '@ionic/angular';
 import { injectQueryClient } from '@tanstack/angular-query-experimental';
 import { TrainingApi } from './training.api';
 import { trainingKeys } from './training.keys';
 import { RoutineFolder } from './folder.model';
 import { RoutineDetail, UpdateRoutineRequest } from './routine.model';
+
+/** Minimum shape for actions that only need identity — accepts summary or detail. */
+type RoutineRef = { id: number; title: string };
 
 /**
  * Orchestrates every user-initiated mutation on training routines +
@@ -29,6 +32,7 @@ export class TrainingActionsService {
   private readonly api = inject(TrainingApi);
   private readonly queryClient = injectQueryClient();
   private readonly alerts = inject(AlertController);
+  private readonly toasts = inject(ToastController);
 
   // ---------- Folders ----------
 
@@ -78,7 +82,7 @@ export class TrainingActionsService {
   }
 
   /** Accepts either shape (summary or detail) — only title + id are used. */
-  async confirmDeleteRoutine(routine: { id: number; title: string }): Promise<void> {
+  async confirmDeleteRoutine(routine: RoutineRef): Promise<void> {
     const ok = await this.confirm({
       header: 'Borrar rutina',
       message: `¿Borrar "${routine.title}"? No se puede deshacer.`,
@@ -107,7 +111,7 @@ export class TrainingActionsService {
     await this.invalidate();
   }
 
-  async confirmCloneRoutine(routine: RoutineDetail): Promise<void> {
+  async confirmCloneRoutine(routine: RoutineRef): Promise<void> {
     const ok = await this.confirm({
       header: 'Duplicar rutina',
       message: `Se creará una copia editable de "${routine.title}".`,
@@ -116,6 +120,17 @@ export class TrainingActionsService {
     if (!ok) return;
     await firstValueFrom(this.api.cloneRoutine(routine.id));
     await this.invalidate();
+  }
+
+  /** Placeholder feedback for actions the UI exposes but backend/frontend
+   *  do not implement yet (share link, superset UI, exercise replace). */
+  async notImplemented(feature: string): Promise<void> {
+    const toast = await this.toasts.create({
+      message: `${feature}: próximamente`,
+      duration: 1500,
+      position: 'bottom',
+    });
+    await toast.present();
   }
 
   // ---------- Internals ----------
