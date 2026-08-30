@@ -94,6 +94,11 @@ export class SelectSheetService {
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      /* Extra room below the last option + safe-area for the gesture
+         bar / iOS notch. Without this the last row hugs the bottom
+         edge and (on some viewports) the sheet doesn't quite reach
+         the bottom of the screen, leaving a white/black seam. */
+      padding-bottom: max(env(safe-area-inset-bottom), 20px);
     }
     .grabber {
       align-self: center;
