@@ -57,8 +57,14 @@ export class SelectSheetService {
       hasBackdrop: true,
       backdropClass: 'cdk-overlay-dark-backdrop',
       scrollStrategy: this.overlay.scrollStrategies.block(),
+      // Position the wrapper 100px BELOW the viewport bottom so the
+      // sheet bleeds past Chrome Android's dynamic URL bar / gesture
+      // area — otherwise a white strip peeks through under the sheet
+      // when the layout viewport is shorter than the visual viewport.
+      // The sheet's own padding-bottom compensates so content stays
+      // visually inside the safe area.
       positionStrategy: this.overlay.position()
-          .global().bottom('0').centerHorizontally(),
+          .global().bottom('-100px').centerHorizontally(),
     });
     const ref = overlayRef.attach(new ComponentPortal(SelectSheetComponent, vcr));
     ref.setInput('header', config.header);
@@ -94,14 +100,12 @@ export class SelectSheetService {
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      /* Bleed 60px past the CDK overlay's bottom edge so the dark
-         background covers any gap Chrome Android leaves for its URL
-         bar / gesture area — no white seam. margin-bottom pulls the
-         sheet's own box 60px lower; padding-bottom keeps the last
-         option 60px + safe-area away from where the screen actually
-         ends so it still looks like a normal roomy bottom sheet. */
-      margin-bottom: -60px;
-      padding-bottom: calc(max(env(safe-area-inset-bottom), 20px) + 60px);
+      /* The CDK positionStrategy sits the wrapper 100px below the
+         viewport so the sheet's dark background always covers any
+         URL-bar / gesture gap Chrome Android leaves under the sheet.
+         Compensate with extra bottom padding so the last option
+         still ends inside the safe area. */
+      padding-bottom: calc(max(env(safe-area-inset-bottom), 20px) + 100px);
     }
     .grabber {
       align-self: center;
