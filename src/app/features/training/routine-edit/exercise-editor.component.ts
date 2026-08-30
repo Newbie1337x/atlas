@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
   IonCard, IonCardHeader, IonCardTitle, IonCardContent,
@@ -10,7 +10,7 @@ import { addOutline, ellipsisVertical } from 'ionicons/icons';
 import { RoutineExercise } from '@core/training/routine.model';
 import { TrainingActionsService } from '@core/training/training-actions.service';
 import { RoutineEditFormService } from './routine-edit-form.service';
-import { SetEditorComponent } from './set-editor.component';
+import { RepsMode, SetEditorComponent } from './set-editor.component';
 import { ExerciseIconComponent } from '../shared/exercise-icon.component';
 import { RestPickerComponent } from '../shared/rest-picker.component';
 import { ReorderExercisesModalComponent } from './reorder-exercises-modal.component';
@@ -47,14 +47,12 @@ import { ReorderExercisesModalComponent } from './reorder-exercises-modal.compon
     }
     .header-legend {
       display: grid;
-      grid-template-columns: 32px 60px 1fr 1fr 60px 32px;
       gap: 4px;
       padding: 4px 8px;
       font-size: 0.75em;
       color: var(--ion-color-medium, #666);
       text-transform: uppercase;
     }
-    .header-legend .num { text-align: right; }
   `],
   template: `
     <ion-card>
@@ -91,18 +89,20 @@ import { ReorderExercisesModalComponent } from './reorder-exercises-modal.compon
           [ngModel]="exercise().notes"
           (ngModelChange)="form.updateExerciseNotes(index(), $event)" />
 
-        <div class="header-legend">
+        <div class="header-legend" [style.grid-template-columns]="gridTemplate()">
           <span>Tipo</span>
           <span>Reps</span>
-          <span>Max</span>
+          @if (repsMode() === 'range') { <span>Max</span> }
           <span>Kg</span>
-          <span>RPE</span>
+          @if (showRpe()) { <span>RPE</span> }
           <span></span>
         </div>
 
         @for (s of exercise().sets; track $index) {
           <training-set-editor
             [set]="s"
+            [repsMode]="repsMode()"
+            [showRpe]="showRpe()"
             (patchSet)="form.updateSet(index(), $index, $event)"
             (remove)="form.removeSet(index(), $index)" />
         }
@@ -125,8 +125,45 @@ export class ExerciseEditorComponent {
   private readonly modal = inject(ModalController);
   private readonly actions = inject(TrainingActionsService);
 
+  /**
+   * Per-exercise view preferences. Inferred from the initial data
+   * (sets with min === max → single; any set with a non-null RPE →
+   * showRpe on) and then mutable via the ⋮ menu. Not persisted
+   * server-side; when the editor is reopened the same inference runs
+   * again on whatever the routine now contains.
+   */
+  protected readonly repsMode = signal<RepsMode>('range');
+  protected readonly showRpe = signal<boolean>(false);
+
+  /** Grid template mirrors the set-editor row so the legend + data align. */
+  protected readonly gridTemplate = computed(() => {
+    const type = '32px';
+    const reps = this.repsMode() === 'range' ? '60px 1fr' : '1fr';
+    const kg = '1fr';
+    const rpe = this.showRpe() ? '60px' : '';
+    const remove = '32px';
+    return [type, reps, kg, rpe, remove].filter(Boolean).join(' ');
+  });
+
+  /** Guards the inference below — once the user opens the menu and
+   *  toggles anything, their choice wins even if the raw data would
+   *  suggest otherwise. */
+  private inferred = false;
+
   constructor() {
     addIcons({ 'add-outline': addOutline, 'ellipsis-vertical': ellipsisVertical });
+    // Seed the view preferences from the initial data ONCE. Later set
+    // edits (e.g. mirror-write in single mode) must not flip the mode
+    // back and forth.
+    effect(() => {
+      const ex = this.exercise();
+      if (this.inferred) return;
+      const inferredMode: RepsMode = ex.sets.every(s => s.targetRepsMin === s.targetRepsMax)
+        ? 'single' : 'range';
+      this.repsMode.set(inferredMode);
+      this.showRpe.set(ex.sets.some(s => s.targetRpe != null));
+      this.inferred = true;
+    }, { allowSignalWrites: true });
   }
 
   // ---------- Long-press on header → same ActionSheet ----------
@@ -171,6 +208,11 @@ export class ExerciseEditorComponent {
     const sheet = await this.sheets.create({
       header: ex.exerciseName ?? `Ejercicio #${ex.exerciseId}`,
       buttons: [
+        { text: 'Opciones de repeticiones', handler: () => { this.openRepsOptions(); } },
+        {
+          text: this.showRpe() ? 'Ocultar RPE' : 'Mostrar RPE',
+          handler: () => { this.toggleRpe(); },
+        },
         { text: 'Reordenar ejercicios',   handler: () => { this.openReorder(); } },
         { text: 'Reemplazar ejercicio',   handler: () => { this.actions.notImplemented('Reemplazar'); } },
         { text: 'Agregar a superserie',   handler: () => { this.actions.notImplemented('Superserie'); } },
@@ -179,6 +221,48 @@ export class ExerciseEditorComponent {
       ],
     });
     await sheet.present();
+  }
+
+  private async openRepsOptions(): Promise<void> {
+    const current = this.repsMode();
+    const sheet = await this.sheets.create({
+      header: 'Opciones de repeticiones',
+      buttons: [
+        {
+          text: 'Repeticiones' + (current === 'single' ? ' ✓' : ''),
+          handler: () => { this.setRepsMode('single'); },
+        },
+        {
+          text: 'Rango de repeticiones' + (current === 'range' ? ' ✓' : ''),
+          handler: () => { this.setRepsMode('range'); },
+        },
+        { text: 'Cancelar', role: 'cancel' },
+      ],
+    });
+    await sheet.present();
+  }
+
+  /**
+   * When switching TO single mode, mirror every set's max into its min
+   * so the backend sees consistent "N reps" values (min===max). When
+   * switching TO range, leave the data as-is — user can widen max
+   * per-set from there.
+   */
+  private setRepsMode(mode: RepsMode): void {
+    if (this.repsMode() === mode) return;
+    this.repsMode.set(mode);
+    if (mode === 'single') {
+      const ex = this.exercise();
+      ex.sets.forEach((s, i) => {
+        if (s.targetRepsMin !== s.targetRepsMax) {
+          this.form.updateSet(this.index(), i, { targetRepsMax: s.targetRepsMin });
+        }
+      });
+    }
+  }
+
+  private toggleRpe(): void {
+    this.showRpe.update(v => !v);
   }
 
   private async openReorder(): Promise<void> {

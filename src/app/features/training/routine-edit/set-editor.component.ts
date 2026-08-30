@@ -1,25 +1,34 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
   IonInput, IonSelect, IonSelectOption, IonButton, IonIcon,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { closeCircle } from 'ionicons/icons';
-import { RoutineSet, SetType } from '@core/training/routine.model';
+import { RoutineSet } from '@core/training/routine.model';
+
+/** How reps are edited for this row. Chosen at the exercise level and
+ *  passed down — single = one number, range = min-max. */
+export type RepsMode = 'single' | 'range';
 
 /**
- * One set row inside an exercise editor. Inputs for reps range (min-max),
- * weight, RPE. Set type as a compact select (WORKING is the default and
- * the only one 95% of users touch — the others live under a small select
- * for the ones who do).
+ * One set row inside an exercise editor. Type select + reps input(s) +
+ * weight + (optional) RPE + remove.
+ *
+ * Layout adapts to two exercise-level preferences (passed as inputs):
+ *   - repsMode: 'single' collapses reps into one column and mirrors it
+ *     into both min/max on write; 'range' keeps the two-column layout.
+ *   - showRpe: hides the RPE column when off. Existing values stay on
+ *     the row unchanged — the toggle is UI-only.
  *
  * Duration + distance columns are omitted from this compact row — they
  * apply to cardio / timed sets which the MVP does not surface. When we
  * do, they belong in a separate compact-select "kind: strength | cardio"
  * that swaps the visible column set.
  *
- * Emits a partial patch; the parent (exercise-editor) forwards to the
- * form service. Zero business logic here.
+ * Emits partial patches; the parent (exercise-editor) forwards to the
+ * form service. Zero business logic here beyond mirror-write for single
+ * reps.
  */
 @Component({
   selector: 'training-set-editor',
@@ -32,7 +41,6 @@ import { RoutineSet, SetType } from '@core/training/routine.model';
   styles: [`
     .row {
       display: grid;
-      grid-template-columns: 32px 60px 1fr 1fr 60px 32px;
       align-items: center;
       gap: 4px;
       padding: 4px 8px;
@@ -46,10 +54,9 @@ import { RoutineSet, SetType } from '@core/training/routine.model';
       text-align: center;
       color: var(--ion-color-medium, #666);
     }
-    .num { text-align: right; }
   `],
   template: `
-    <div class="row">
+    <div class="row" [style.grid-template-columns]="gridTemplate()">
       <ion-select
         interface="popover"
         [ngModel]="set().setType"
@@ -65,16 +72,18 @@ import { RoutineSet, SetType } from '@core/training/routine.model';
       <ion-input
         type="number"
         placeholder="reps"
-        aria-label="Repeticiones mínimas"
+        aria-label="Repeticiones"
         [ngModel]="set().targetRepsMin"
-        (ngModelChange)="patch({ targetRepsMin: numeric($event) })" />
+        (ngModelChange)="onRepsMinChange($event)" />
 
-      <ion-input
-        type="number"
-        placeholder="a"
-        aria-label="Repeticiones máximas"
-        [ngModel]="set().targetRepsMax"
-        (ngModelChange)="patch({ targetRepsMax: numeric($event) })" />
+      @if (repsMode() === 'range') {
+        <ion-input
+          type="number"
+          placeholder="a"
+          aria-label="Repeticiones máximas"
+          [ngModel]="set().targetRepsMax"
+          (ngModelChange)="patch({ targetRepsMax: numeric($event) })" />
+      }
 
       <ion-input
         type="number"
@@ -84,13 +93,15 @@ import { RoutineSet, SetType } from '@core/training/routine.model';
         [ngModel]="set().targetWeightKg"
         (ngModelChange)="patch({ targetWeightKg: numeric($event) })" />
 
-      <ion-input
-        type="number"
-        inputmode="decimal"
-        placeholder="RPE"
-        aria-label="RPE"
-        [ngModel]="set().targetRpe"
-        (ngModelChange)="patch({ targetRpe: numeric($event) })" />
+      @if (showRpe()) {
+        <ion-input
+          type="number"
+          inputmode="decimal"
+          placeholder="RPE"
+          aria-label="RPE"
+          [ngModel]="set().targetRpe"
+          (ngModelChange)="patch({ targetRpe: numeric($event) })" />
+      }
 
       <ion-button fill="clear" size="small" (click)="remove.emit()" aria-label="Quitar serie">
         <ion-icon slot="icon-only" name="close-circle" color="danger" />
@@ -100,11 +111,32 @@ import { RoutineSet, SetType } from '@core/training/routine.model';
 })
 export class SetEditorComponent {
   readonly set = input.required<RoutineSet>();
+  readonly repsMode = input<RepsMode>('range');
+  readonly showRpe = input<boolean>(false);
   readonly patchSet = output<Partial<RoutineSet>>();
   readonly remove = output<void>();
 
+  /** Column layout — reflects which optional columns are visible. */
+  protected readonly gridTemplate = computed(() => {
+    const type = '32px';
+    const reps = this.repsMode() === 'range' ? '60px 1fr' : '1fr';
+    const kg = '1fr';
+    const rpe = this.showRpe() ? '60px' : '';
+    const remove = '32px';
+    return [type, reps, kg, rpe, remove].filter(Boolean).join(' ');
+  });
+
   constructor() {
     addIcons({ 'close-circle': closeCircle });
+  }
+
+  /** In single mode a rep count applies to both min and max so the
+   *  backend treats "10 reps" as an exact target, not a range 10-null. */
+  protected onRepsMinChange(raw: unknown): void {
+    const n = this.numeric(raw);
+    const patch: Partial<RoutineSet> = { targetRepsMin: n };
+    if (this.repsMode() === 'single') patch.targetRepsMax = n;
+    this.patchSet.emit(patch);
   }
 
   protected patch(p: Partial<RoutineSet>): void {
