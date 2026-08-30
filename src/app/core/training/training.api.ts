@@ -3,7 +3,9 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { API_BASE_URL } from '@core/auth/auth.tokens';
 import { OffsetPage } from '@core/pagination.model';
-import { CatalogExercise } from './exercise.model';
+import {
+  CatalogExercise, ExerciseInputPreference, InputPreferenceRequest,
+} from './exercise.model';
 import { RoutineFolder, RoutineFolderRequest } from './folder.model';
 import {
   CreateRoutineRequest, RoutineDetail, RoutineSummary, UpdateRoutineRequest,
@@ -82,5 +84,21 @@ export class TrainingApi {
    *  that client-side filter beats a search endpoint round-trip. */
   listExercises(): Observable<CatalogExercise[]> {
     return this.http.get<CatalogExercise[]>(`${this.baseUrl}/api/training/exercises`);
+  }
+
+  // --- Per-exercise input preference (KG vs BRICKS + brick weight) ---
+  // globalProfileId is inferred from the JWT server-side.
+
+  /** null = the user never chose (client should default to KG on machines). */
+  getInputPreference(exerciseId: number): Observable<ExerciseInputPreference | null> {
+    return this.http.get<ExerciseInputPreference | null>(
+      `${this.baseUrl}/api/training/exercises/${exerciseId}/input-preference`);
+  }
+
+  putInputPreference(
+    exerciseId: number, body: InputPreferenceRequest,
+  ): Observable<ExerciseInputPreference> {
+    return this.http.put<ExerciseInputPreference>(
+      `${this.baseUrl}/api/training/exercises/${exerciseId}/input-preference`, body);
   }
 }

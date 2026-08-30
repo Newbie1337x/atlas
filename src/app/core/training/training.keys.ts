@@ -20,4 +20,7 @@ export const trainingKeys = {
   routineDetail: (id: number) => [...trainingKeys.all, 'routine', id] as const,
   /** Exercise catalog — long stale time; the list barely changes. */
   exerciseCatalog: () => [...trainingKeys.all, 'exercises'] as const,
+  /** Per-exercise KG/BRICKS preference for the current user. */
+  inputPreference: (exerciseId: number) =>
+    [...trainingKeys.all, 'input-preference', exerciseId] as const,
 };

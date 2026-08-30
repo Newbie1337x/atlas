@@ -129,6 +129,7 @@ import { ReorderExercisesModalComponent } from './reorder-exercises-modal.compon
           <training-set-editor
             [set]="s"
             [index]="$index"
+            [exerciseId]="exercise().exerciseId"
             [repsMode]="repsMode()"
             [showRpe]="showRpe()"
             [capabilities]="caps()"

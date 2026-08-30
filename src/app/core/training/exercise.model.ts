@@ -18,3 +18,26 @@ export interface CatalogExercise {
   isCustom: boolean;
   capabilities: ExerciseCapabilities;
 }
+
+/**
+ * Per-user, per-exercise weight-input preference.
+ *
+ * Server-owned (endpoint: /api/training/exercises/{id}/input-preference).
+ * The globalProfileId is inferred from the JWT; the frontend never sends it.
+ * brickWeightKg defaults to 5.00 in the DB and is only meaningful when
+ * inputMode === 'BRICKS' (guarded by the exercise's capabilities.bricks).
+ */
+export type InputMode = 'KG' | 'BRICKS';
+
+export interface ExerciseInputPreference {
+  id: number | null;
+  globalProfileId: number | null;
+  exerciseId: number;
+  inputMode: InputMode;
+  brickWeightKg: number;
+}
+
+export interface InputPreferenceRequest {
+  inputMode: InputMode;
+  brickWeightKg: number | null;
+}
