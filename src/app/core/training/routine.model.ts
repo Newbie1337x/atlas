@@ -37,6 +37,20 @@ export interface ExerciseCapabilities {
   allowedSetTypes: SetType[];
 }
 
+/**
+ * Wildly permissive defaults for a set/exercise whose capabilities
+ * haven't been resolved yet from the backend (older routines missing
+ * the computed field). Renders every input rather than silently hiding
+ * one — the backend guard is still authoritative on save, so any
+ * over-shown field the exercise doesn't accept will 422 before it
+ * corrupts data.
+ */
+export const PERMISSIVE_CAPS: ExerciseCapabilities = {
+  weight: true, reps: true, duration: false, distance: false,
+  rpe: true, bricks: false,
+  allowedSetTypes: ['WORKING', 'WARMUP', 'NORMAL', 'DROP_SET', 'FAILURE'],
+};
+
 export interface ExercisePreview {
   exerciseId: number;
   name: string | null;

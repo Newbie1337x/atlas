@@ -12,7 +12,9 @@ import { addIcons } from 'ionicons';
 import { addOutline, caretDown, ellipsisVertical } from 'ionicons/icons';
 import { firstValueFrom } from 'rxjs';
 import { injectQuery } from '@tanstack/angular-query-experimental';
-import { RoutineExercise } from '@core/training/routine.model';
+import {
+  ExerciseCapabilities, PERMISSIVE_CAPS, RepsMode, RoutineExercise,
+} from '@core/training/routine.model';
 import { InputMode } from '@core/training/exercise.model';
 import { TrainingActionsService } from '@core/training/training-actions.service';
 import { TrainingApi } from '@core/training/training.api';
@@ -20,15 +22,6 @@ import { trainingKeys } from '@core/training/training.keys';
 import { RoutineEditFormService } from './routine-edit-form.service';
 import { SetEditorComponent } from './set-editor.component';
 import { WeightModePickerService } from '../shared/weight-mode-picker.service';
-import { ExerciseCapabilities, RepsMode } from '@core/training/routine.model';
-
-/** Permissive default so the editor renders every input if the backend
- *  didn't ship capabilities (legacy routine, missing exercise metadata). */
-const PERMISSIVE_CAPS: ExerciseCapabilities = {
-  weight: true, reps: true, duration: false, distance: false,
-  rpe: true, bricks: false,
-  allowedSetTypes: ['WORKING', 'WARMUP', 'NORMAL', 'DROP_SET', 'FAILURE'],
-};
 import { ExerciseIconComponent } from '../shared/exercise-icon.component';
 import { RestPickerComponent } from '../shared/rest-picker.component';
 import { SelectSheetService } from '../shared/select-sheet.service';

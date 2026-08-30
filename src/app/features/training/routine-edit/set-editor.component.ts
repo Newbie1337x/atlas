@@ -4,7 +4,9 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { IonInput, IonButton } from '@ionic/angular';
-import { ExerciseCapabilities, RepsMode, RoutineSet, SetType } from '@core/training/routine.model';
+import {
+  ExerciseCapabilities, PERMISSIVE_CAPS, RepsMode, RoutineSet, SetType,
+} from '@core/training/routine.model';
 import { InputMode } from '@core/training/exercise.model';
 import { SelectSheetService, SelectSheetOption } from '../shared/select-sheet.service';
 import { RoutineEditFormService } from './routine-edit-form.service';
@@ -19,12 +21,6 @@ const GLYPH_BY_TYPE: Partial<Record<SetType, string>> = {
 };
 const CLASS_BY_TYPE: Partial<Record<SetType, string>> = {
   WARMUP: 'warmup', DROP_SET: 'drop', FAILURE: 'failure',
-};
-
-const PERMISSIVE_CAPS: ExerciseCapabilities = {
-  weight: true, reps: true, duration: false, distance: false,
-  rpe: true, bricks: false,
-  allowedSetTypes: ['WORKING', 'WARMUP', 'NORMAL', 'DROP_SET', 'FAILURE'],
 };
 
 /**
