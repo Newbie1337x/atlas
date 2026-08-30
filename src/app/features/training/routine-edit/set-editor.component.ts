@@ -77,10 +77,15 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
     <div class="row" [style.grid-template-columns]="gridTemplate()">
       <!-- Serie: dropdown filtered to allowed set types (WORKING option
            shows the row number). -->
+      <!-- selectedText is bound explicitly because ion-select caches the
+           projected option text; when a sibling's setType change shifts
+           this row's WORKING label from "3" to "2" the option is
+           recomputed but the header stays stale until re-picked. -->
       <ion-select
         class="serie"
         interface="popover"
         [ngModel]="set().setType"
+        [selectedText]="selectedTypeLabel()"
         (ngModelChange)="patch({ setType: $event })"
         aria-label="Tipo de serie">
         @for (opt of typeOptions(); track opt.value) {
@@ -176,6 +181,12 @@ export class SetEditorComponent {
 
   /** Resolved caps — never null in the template; falls back permissively. */
   protected readonly caps = computed(() => this.capabilities() ?? PERMISSIVE_CAPS);
+
+  /** Text shown in the collapsed ion-select — derives from the same
+   *  option list so a re-numbering after a sibling change repaints
+   *  without waiting for the user to reopen the picker. */
+  protected readonly selectedTypeLabel = computed(() =>
+    this.typeOptions().find(o => o.value === this.set().setType)?.label ?? '');
 
   /** Set-type options the backend guard will actually accept for this
    *  exercise. WORKING uses the ordinal-among-workings so warmups don't
