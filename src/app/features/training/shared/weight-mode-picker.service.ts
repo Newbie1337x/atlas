@@ -31,11 +31,11 @@ export class WeightModePickerService {
   private readonly alerts = inject(AlertController);
 
   /**
-   * Opens the mode sheet. When the user picks BRICKS for the first time
-   * (currentMode !== 'BRICKS'), a follow-up prompt asks for the brick
-   * weight so we don't silently commit them to the DB default. Picking
-   * "Cambiar peso del ladrillo…" (only visible while bricks is active)
-   * jumps straight to the prompt.
+   * Opens the mode sheet. Two rows: Kilos or Ladrillos. When bricks is
+   * already the active mode, tapping the Ladrillos row opens the weight
+   * prompt instead (dual-purpose row — the label hints at that). First
+   * switch to BRICKS accepts the current weight silently (default 5 kg
+   * from the DB) — no prompt, the user changes it later if needed.
    */
   async open(
     vcr: ViewContainerRef,
@@ -43,30 +43,26 @@ export class WeightModePickerService {
     currentMode: InputMode,
     currentWeight: number,
   ): Promise<void> {
-    const options = [
-      { label: 'Kilos', value: 'KG' },
-      { label: `Ladrillos (${currentWeight} kg c/u)`, value: 'BRICKS' },
-    ];
-    if (currentMode === 'BRICKS') {
-      options.push({ label: 'Cambiar peso del ladrillo…', value: 'edit-weight' });
-    }
+    const bricksLabel = currentMode === 'BRICKS'
+      ? `Ladrillos (${currentWeight} kg — cambiar peso)`
+      : `Ladrillos (${currentWeight} kg c/u)`;
     const picked = await this.sheets.open(vcr, {
       header: 'Contar el peso como',
       value: currentMode,
-      options,
+      options: [
+        { label: 'Kilos', value: 'KG' },
+        { label: bricksLabel, value: 'BRICKS' },
+      ],
     });
     if (picked === null) return;
-    if (picked === 'edit-weight') {
+    if (picked === 'BRICKS' && currentMode === 'BRICKS') {
+      // Same row tapped while already in bricks → edit the weight.
       await this.promptBrickWeight(exerciseId, currentWeight);
       return;
     }
     if (picked === currentMode) return;
-    if (picked === 'BRICKS') {
-      await this.save(exerciseId, 'BRICKS', currentWeight);
-      await this.promptBrickWeight(exerciseId, currentWeight);
-    } else {
-      await this.save(exerciseId, picked as InputMode, currentWeight);
-    }
+    // Fresh switch — save silently. Default weight comes from the DB (5 kg).
+    await this.save(exerciseId, picked as InputMode, currentWeight);
   }
 
   private async promptBrickWeight(exerciseId: number, current: number): Promise<void> {

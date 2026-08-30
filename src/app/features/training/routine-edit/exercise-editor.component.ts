@@ -144,6 +144,7 @@ import { ReorderExercisesModalComponent } from './reorder-exercises-modal.compon
           <training-set-editor
             [set]="s"
             [index]="$index"
+            [workingOrdinal]="workingOrdinals()[$index]"
             [repsMode]="repsMode()"
             [showRpe]="showRpe()"
             [capabilities]="caps()"
@@ -205,6 +206,16 @@ export class ExerciseEditorComponent {
   /** Server-computed input matrix for this exercise; falls back permissive. */
   protected readonly caps = computed<ExerciseCapabilities>(() =>
     this.exercise().capabilities ?? PERMISSIVE_CAPS);
+
+  /**
+   * 1-based ordinal per set among ONLY WORKING sets — non-working rows
+   * get 0 (they render W/D/F). Lets the set-editor number 1,2,3 even
+   * when preceded by warmup rows: [W W 1 2 3] instead of [W W 3 4 5].
+   */
+  protected readonly workingOrdinals = computed<number[]>(() => {
+    let n = 0;
+    return this.exercise().sets.map(s => s.setType === 'WORKING' ? ++n : 0);
+  });
 
   /** Show-RPE stays a local UI-only signal — no domain field. Seeded
    *  from data once so exercises that already carry an RPE reveal the

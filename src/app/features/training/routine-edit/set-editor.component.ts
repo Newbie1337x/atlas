@@ -150,6 +150,9 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
 export class SetEditorComponent {
   readonly set = input.required<RoutineSet>();
   readonly index = input.required<number>();
+  /** 1-based ordinal counting ONLY working sets. `0` while this row is
+   *  not a WORKING set (warmup/drop/failure use their own letter). */
+  readonly workingOrdinal = input<number>(0);
   readonly repsMode = input<RepsMode>('SINGLE');
   readonly showRpe = input<boolean>(false);
   readonly capabilities = input<ExerciseCapabilities | null>(null);
@@ -174,11 +177,15 @@ export class SetEditorComponent {
   /** Resolved caps — never null in the template; falls back permissively. */
   protected readonly caps = computed(() => this.capabilities() ?? PERMISSIVE_CAPS);
 
-  /** Set-type options the backend guard will actually accept for this exercise. */
+  /** Set-type options the backend guard will actually accept for this
+   *  exercise. WORKING uses the ordinal-among-workings so warmups don't
+   *  push the working numbers up ([W W 1 2 3], not [W W 3 4 5]). Falls
+   *  back to array index+1 if the parent didn't pass an ordinal. */
   protected readonly typeOptions = computed(() => {
     const allowed = new Set(this.caps().allowedSetTypes);
+    const workingLabel = `${this.workingOrdinal() || this.index() + 1}`;
     return [
-      { value: 'WORKING', label: `${this.index() + 1}` },
+      { value: 'WORKING', label: workingLabel },
       { value: 'WARMUP',  label: 'W' },
       { value: 'DROP_SET', label: 'D' },
       { value: 'FAILURE',  label: 'F' },
