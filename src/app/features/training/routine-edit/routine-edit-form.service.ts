@@ -23,9 +23,33 @@ export class RoutineEditFormService {
   readonly draft = this._draft.asReadonly();
   readonly loaded = computed(() => this._draft() !== null);
 
+  /**
+   * Frozen snapshot of every set as it was at load time (or the last
+   * successful save — see routine-edit.page.ts, which refetches +
+   * calls loadFrom again after save). Keyed by set id so lookups
+   * stay stable across draft mutations. Consumed by set-editor to
+   * render the "saved value" placeholder — the greyed reference
+   * that lets the user see what they'd revert to no matter how much
+   * they've typed since. New sets (id = 0) are absent here on
+   * purpose; the placeholder falls back to the unit hint until the
+   * user hits Save and the set gets a real id.
+   */
+  private readonly _originalById = signal<ReadonlyMap<number, RoutineSet>>(new Map());
+  originalSetById(id: number | undefined): RoutineSet | undefined {
+    return id ? this._originalById().get(id) : undefined;
+  }
+
   loadFrom(source: RoutineDetail): void {
     // Deep copy so upstream cache (TanStack Query) stays immutable.
     this._draft.set(structuredClone(source));
+    // Fresh snapshot of every persisted set for the placeholder reference.
+    const snapshot = new Map<number, RoutineSet>();
+    for (const ex of source.exercises) {
+      for (const s of ex.sets) {
+        if (s.id) snapshot.set(s.id, structuredClone(s));
+      }
+    }
+    this._originalById.set(snapshot);
   }
 
   // ---------- Routine header ----------

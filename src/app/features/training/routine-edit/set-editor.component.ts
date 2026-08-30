@@ -1,12 +1,13 @@
 import {
   ChangeDetectionStrategy, Component, ViewContainerRef,
-  computed, inject, input, output, signal,
+  computed, inject, input, output,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { IonInput, IonButton } from '@ionic/angular';
 import { ExerciseCapabilities, RepsMode, RoutineSet, SetType } from '@core/training/routine.model';
 import { InputMode } from '@core/training/exercise.model';
 import { SelectSheetService, SelectSheetOption } from '../shared/select-sheet.service';
+import { RoutineEditFormService } from './routine-edit-form.service';
 
 /** Wildly permissive default when the parent has not yet resolved the
  *  exercise's capabilities from the backend (older routines missing the
@@ -184,6 +185,7 @@ export class SetEditorComponent {
 
   private readonly sheets = inject(SelectSheetService);
   private readonly vcr = inject(ViewContainerRef);
+  private readonly form = inject(RoutineEditFormService);
 
   protected readonly isBricks = computed(() => this.inputMode() === 'BRICKS');
 
@@ -280,57 +282,67 @@ export class SetEditorComponent {
   }
 
   /**
-   * Which input is currently focused + the value it had at focus time.
-   * That value stays as the placeholder for the whole focus session,
-   * even if the user types and backspaces to empty again — the "prev"
-   * is what was there before this tap, not what's in the DOM now.
+   * The saved reference value for a named field — from the last time
+   * the routine was loaded from the backend (see
+   * RoutineEditFormService.originalSetById). Independent of what the
+   * user has been typing this session: even after edit + delete cycles,
+   * this stays as the "what was there when I opened this routine"
+   * anchor. Refreshes only on Save + refetch. New sets (id = 0) have
+   * no snapshot → returns empty and the placeholder falls back to the
+   * unit hint.
+   *
+   * Bricks mode: convert the kg snapshot into bricks so the displayed
+   * placeholder matches the input's own unit.
    */
-  protected readonly focusedField = signal<{ name: string; prev: string } | null>(null);
-
-  /** Read the current model value for a named field, as a string. Runs
-   *  synchronously in the focus handler so the placeholder swap paints
-   *  in the same frame — no "rpe/max" flicker before the real value. */
-  private prevFor(name: string): string {
-    const s = this.set();
-    const raw = name === 'kg'      ? this.displayedWeight()
-              : name === 'repsMax' ? s.targetRepsMax
-              : name === 'rpe'     ? s.targetRpe
-              :                      s.targetRepsMin;  // reps + repsMin
+  private savedFor(name: string): string {
+    const original = this.form.originalSetById(this.set().id);
+    if (!original) return '';
+    if (name === 'kg') {
+      const kg = original.targetWeightKg;
+      if (kg == null) return '';
+      if (this.isBricks()) {
+        const bw = this.brickWeightKg();
+        return bw > 0 ? String(kg / bw) : '';
+      }
+      return String(kg);
+    }
+    const raw = name === 'repsMax' ? original.targetRepsMax
+              : name === 'rpe'     ? original.targetRpe
+              :                      original.targetRepsMin;  // reps + repsMin
     return raw == null ? '' : String(raw);
   }
 
-  /** While this input is focused-and-empty, its placeholder becomes the
-   *  value it had at focus time ("20") instead of the unit hint ("kg")
-   *  — user always sees the reference, even after typing + deleting. */
+  /** Placeholder for a numeric input: saved reference value if present,
+   *  otherwise the unit hint. Browser only paints it when the input is
+   *  visually empty, which happens on load (untouched new sets), on
+   *  focus (we clear the DOM), or after the user backspaces to empty. */
   protected placeholderFor(name: string, fallback: string): string {
-    const f = this.focusedField();
-    return f?.name === name && f.prev ? f.prev : fallback;
+    return this.savedFor(name) || fallback;
   }
 
   /**
-   * On focus: publish { name, prev } SYNCHRONOUSLY so the placeholder
-   * paints correctly on the first frame. Then (async) clear the DOM
-   * value without firing an input event — the model keeps the old
-   * number. If the user blurs without typing anything, restore the
-   * value from the snapshot.
+   * On focus: clear the DOM value without firing an input event so the
+   * model keeps the old number and the browser shows the placeholder
+   * (which is now the saved reference). If the user blurs without
+   * having typed anything, restore the value that was there at focus
+   * time (which may not be the saved snapshot — it's whatever the
+   * user had before this tap).
    *
    * No text selection ever happens, so Chrome Android's ActionMode
    * popup (Traducir/Cortar/Copiar/Pegar) never appears — works
    * identically in Capacitor.
    */
-  protected clearOnFocus(name: string, ev: Event): void {
-    const prev = this.prevFor(name);
-    this.focusedField.set({ name, prev });
+  protected clearOnFocus(_name: string, ev: Event): void {
     const el = ev.target as HTMLIonInputElement | null;
     void el?.getInputElement().then(native => {
       if (!native) return;
+      const prev = native.value;
       native.value = '';
       let touched = false;
       const onInput = () => { touched = true; };
       const onBlur = () => {
         native.removeEventListener('input', onInput);
         native.removeEventListener('blur', onBlur);
-        this.focusedField.set(null);
         if (!touched && native.value === '' && prev) {
           native.value = prev;
           native.dispatchEvent(new Event('input', { bubbles: true }));
