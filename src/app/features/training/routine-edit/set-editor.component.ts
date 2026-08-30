@@ -280,52 +280,65 @@ export class SetEditorComponent {
   }
 
   /**
-   * Tracks the currently focused numeric field + the value it had at
-   * focus time. The template reads this to render a dim hint under
-   * the empty input ("preview until you type"). Only one field can be
-   * focused at a time so a single signal suffices.
+   * Which input is currently focused + the value it had at focus time.
+   * That value stays as the placeholder for the whole focus session,
+   * even if the user types and backspaces to empty again — the "prev"
+   * is what was there before this tap, not what's in the DOM now.
    */
   protected readonly focusedField = signal<{ name: string; prev: string } | null>(null);
 
+  /** Read the current model value for a named field, as a string. Runs
+   *  synchronously in the focus handler so the placeholder swap paints
+   *  in the same frame — no "rpe/max" flicker before the real value. */
+  private prevFor(name: string): string {
+    const s = this.set();
+    const raw = name === 'kg'      ? this.displayedWeight()
+              : name === 'repsMax' ? s.targetRepsMax
+              : name === 'rpe'     ? s.targetRpe
+              :                      s.targetRepsMin;  // reps + repsMin
+    return raw == null ? '' : String(raw);
+  }
+
   /** While this input is focused-and-empty, its placeholder becomes the
-   *  previous value ("20") instead of the unit hint ("kg") so the user
-   *  still sees what was there. Everywhere else: unit hint. */
+   *  value it had at focus time ("20") instead of the unit hint ("kg")
+   *  — user always sees the reference, even after typing + deleting. */
   protected placeholderFor(name: string, fallback: string): string {
     const f = this.focusedField();
     return f?.name === name && f.prev ? f.prev : fallback;
   }
 
   /**
-   * On focus, clear the DOM value (without firing an input event, so
-   * the model keeps the old number) and publish { name, prev } so the
-   * hint under the input shows what was there. The next keystroke
-   * clears the hint (input event fires) and fills the field. Blur
-   * without typing restores the value from the snapshot.
+   * On focus: publish { name, prev } SYNCHRONOUSLY so the placeholder
+   * paints correctly on the first frame. Then (async) clear the DOM
+   * value without firing an input event — the model keeps the old
+   * number. If the user blurs without typing anything, restore the
+   * value from the snapshot.
    *
    * No text selection ever happens, so Chrome Android's ActionMode
    * popup (Traducir/Cortar/Copiar/Pegar) never appears — works
    * identically in Capacitor.
    */
-  protected async clearOnFocus(name: string, ev: Event): Promise<void> {
-    const el = ev.target as HTMLIonInputElement | null;
-    const native = await el?.getInputElement();
-    if (!native) return;
-    const prev = native.value;
-    native.value = '';
+  protected clearOnFocus(name: string, ev: Event): void {
+    const prev = this.prevFor(name);
     this.focusedField.set({ name, prev });
-    const onInput = () => this.focusedField.set(null);
-    const onBlur = () => {
-      native.removeEventListener('input', onInput);
-      native.removeEventListener('blur', onBlur);
-      const wasFocused = this.focusedField()?.name === name;
-      this.focusedField.set(null);
-      if (wasFocused && native.value === '') {
-        native.value = prev;
-        native.dispatchEvent(new Event('input', { bubbles: true }));
-      }
-    };
-    native.addEventListener('input', onInput, { once: true });
-    native.addEventListener('blur', onBlur);
+    const el = ev.target as HTMLIonInputElement | null;
+    void el?.getInputElement().then(native => {
+      if (!native) return;
+      native.value = '';
+      let touched = false;
+      const onInput = () => { touched = true; };
+      const onBlur = () => {
+        native.removeEventListener('input', onInput);
+        native.removeEventListener('blur', onBlur);
+        this.focusedField.set(null);
+        if (!touched && native.value === '' && prev) {
+          native.value = prev;
+          native.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      };
+      native.addEventListener('input', onInput);
+      native.addEventListener('blur', onBlur);
+    });
   }
 
   /** Coerce IonInput's string / null to a number or null. Empty → null. */
