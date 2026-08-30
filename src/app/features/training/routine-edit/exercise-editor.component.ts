@@ -11,7 +11,7 @@ import {
 import { addIcons } from 'ionicons';
 import { addOutline, caretDown, ellipsisVertical } from 'ionicons/icons';
 import { firstValueFrom } from 'rxjs';
-import { injectQuery, injectQueryClient } from '@tanstack/angular-query-experimental';
+import { injectQuery } from '@tanstack/angular-query-experimental';
 import { RoutineExercise } from '@core/training/routine.model';
 import { InputMode } from '@core/training/exercise.model';
 import { TrainingActionsService } from '@core/training/training-actions.service';
@@ -19,6 +19,7 @@ import { TrainingApi } from '@core/training/training.api';
 import { trainingKeys } from '@core/training/training.keys';
 import { RoutineEditFormService } from './routine-edit-form.service';
 import { SetEditorComponent } from './set-editor.component';
+import { WeightModePickerService } from '../shared/weight-mode-picker.service';
 import { ExerciseCapabilities, RepsMode } from '@core/training/routine.model';
 
 /** Permissive default so the editor renders every input if the backend
@@ -172,7 +173,7 @@ export class ExerciseEditorComponent {
   private readonly selectSheet = inject(SelectSheetService);
   private readonly vcr = inject(ViewContainerRef);
   private readonly api = inject(TrainingApi);
-  private readonly queryClient = injectQueryClient();
+  private readonly weightPicker = inject(WeightModePickerService);
 
   /**
    * Per-user KG/BRICKS preference for this exercise. Fetched only on
@@ -308,69 +309,12 @@ export class ExerciseEditorComponent {
     if (picked === 'SINGLE' || picked === 'RANGE') this.setRepsMode(picked);
   }
 
-  /**
-   * Weight-mode sheet (KG vs BRICKS). Shows a third row "Cambiar peso del
-   * ladrillo…" only when bricks is already active. Persists via the
-   * per-user endpoint and invalidates its query key so every set-editor
-   * re-reads the fresh value.
-   */
-  protected async openWeightModeSheet(): Promise<void> {
-    const currentMode = this.inputMode();
-    const currentWeight = this.brickWeight();
-    const options = [
-      { label: 'Kilos', value: 'KG' },
-      { label: `Ladrillos (${currentWeight} kg c/u)`, value: 'BRICKS' },
-    ];
-    if (currentMode === 'BRICKS') {
-      options.push({ label: 'Cambiar peso del ladrillo…', value: 'edit-weight' });
-    }
-    const picked = await this.selectSheet.open(this.vcr, {
-      header: 'Contar el peso como',
-      value: currentMode,
-      options,
-    });
-    if (picked === null) return;
-    if (picked === 'edit-weight') { await this.promptBrickWeight(currentWeight); return; }
-    if (picked === currentMode) return;
-    if (picked === 'BRICKS') {
-      // First switch → ask for the brick weight so we don't silently
-      // stick the user with the DB default they never saw.
-      await this.saveInputPreference('BRICKS', currentWeight);
-      await this.promptBrickWeight(currentWeight);
-    } else {
-      await this.saveInputPreference(picked as InputMode, currentWeight);
-    }
-  }
-
-  private async promptBrickWeight(current: number): Promise<void> {
-    const alert = await this.alerts.create({
-      header: 'Peso del ladrillo',
-      inputs: [{
-        name: 'kg', type: 'number', min: 0.25,
-        attributes: { step: '0.25' },
-        value: current, placeholder: 'kg',
-      }],
-      buttons: [
-        { text: 'Cancelar', role: 'cancel' },
-        { text: 'Guardar', role: 'confirm' },
-      ],
-    });
-    await alert.present();
-    const { role, data } = await alert.onDidDismiss<{ values: { kg: string } }>();
-    if (role !== 'confirm') return;
-    const kg = Number(data?.values?.kg);
-    if (!Number.isFinite(kg) || kg <= 0) return;
-    await this.saveInputPreference('BRICKS', kg);
-  }
-
-  private async saveInputPreference(inputMode: InputMode, brickWeightKg: number): Promise<void> {
-    const exerciseId = this.exercise().exerciseId;
-    await firstValueFrom(this.api.putInputPreference(exerciseId, {
-      inputMode, brickWeightKg,
-    }));
-    await this.queryClient.invalidateQueries({
-      queryKey: trainingKeys.inputPreference(exerciseId),
-    });
+  /** Delegate to the shared picker — one line here, all sheet/prompt/save
+   *  flow lives in WeightModePickerService and is reusable from the
+   *  workout runner. */
+  protected openWeightModeSheet(): Promise<void> {
+    return this.weightPicker.open(
+      this.vcr, this.exercise().exerciseId, this.inputMode(), this.brickWeight());
   }
 
   /**
