@@ -23,6 +23,13 @@ export class RoutineEditFormService {
   readonly draft = this._draft.asReadonly();
   readonly loaded = computed(() => this._draft() !== null);
 
+  /** Flips to true on any mutation, back to false when loadFrom re-runs
+   *  (initial load and post-save refetch). Consumers (routine-edit
+   *  page's Back handler, unsaved-changes guard) read this to know
+   *  whether to prompt "descartar cambios?". */
+  private readonly _dirty = signal(false);
+  readonly dirty = this._dirty.asReadonly();
+
   /**
    * Frozen snapshot of every set as it was at load time (or the last
    * successful save — see routine-edit.page.ts, which refetches +
@@ -50,6 +57,7 @@ export class RoutineEditFormService {
       }
     }
     this._originalById.set(snapshot);
+    this._dirty.set(false);
   }
 
   // ---------- Routine header ----------
@@ -163,7 +171,11 @@ export class RoutineEditFormService {
 
   private patch(fn: (d: RoutineDetail) => RoutineDetail): void {
     const current = this._draft();
-    if (current) this._draft.set(fn(current));
+    if (!current) return;
+    this._draft.set(fn(current));
+    // Any mutation flips the draft to dirty; loadFrom clears it back
+    // to false. Consumers use this to gate a "descartar cambios?" prompt.
+    this._dirty.set(true);
   }
 
   private updateExerciseAt(

@@ -4,12 +4,12 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { injectQuery, injectQueryClient } from '@tanstack/angular-query-experimental';
 import {
-  IonHeader, IonToolbar, IonTitle, IonButtons, IonBackButton, IonButton,
+  IonHeader, IonToolbar, IonTitle, IonButtons, IonButton,
   IonContent, IonInput, IonNote, IonSpinner, IonIcon,
-  ModalController,
+  AlertController, ModalController,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { addOutline, checkmarkOutline } from 'ionicons/icons';
+import { addOutline, checkmarkOutline, chevronBackOutline } from 'ionicons/icons';
 import { TrainingApi } from '@core/training/training.api';
 import { trainingKeys } from '@core/training/training.keys';
 import { toUpdateRequest } from '@core/training/training-actions.service';
@@ -40,7 +40,7 @@ import { ExercisePickerComponent } from './routine-edit/exercise-picker.componen
   providers: [RoutineEditFormService],
   imports: [
     FormsModule,
-    IonHeader, IonToolbar, IonTitle, IonButtons, IonBackButton, IonButton,
+    IonHeader, IonToolbar, IonTitle, IonButtons, IonButton,
     IonContent, IonInput, IonNote, IonSpinner, IonIcon,
     ExerciseEditorComponent,
   ],
@@ -48,7 +48,11 @@ import { ExercisePickerComponent } from './routine-edit/exercise-picker.componen
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-back-button [defaultHref]="'/training/routines/' + routineId()" />
+          <!-- Custom back so we can gate on unsaved changes; matches the
+               native ion-back-button visually without its automatic nav. -->
+          <ion-button (click)="cancel()" aria-label="Volver">
+            <ion-icon slot="icon-only" name="chevron-back-outline" />
+          </ion-button>
         </ion-buttons>
         <ion-title>Editar rutina</ion-title>
         <ion-buttons slot="end">
@@ -99,6 +103,7 @@ export class RoutineEditPage {
   private readonly api = inject(TrainingApi);
   private readonly queryClient = injectQueryClient();
   private readonly modal = inject(ModalController);
+  private readonly alerts = inject(AlertController);
   protected readonly form = inject(RoutineEditFormService);
 
   protected readonly saving = signal(false);
@@ -115,7 +120,11 @@ export class RoutineEditPage {
   }));
 
   constructor() {
-    addIcons({ 'add-outline': addOutline, 'checkmark-outline': checkmarkOutline });
+    addIcons({
+      'add-outline': addOutline,
+      'checkmark-outline': checkmarkOutline,
+      'chevron-back-outline': chevronBackOutline,
+    });
     // Seed the draft once the query resolves. Runs again if the id changes
     // (unlikely — this page is one route with one id — but the effect is
     // idempotent because loadFrom replaces the whole draft).
@@ -130,6 +139,28 @@ export class RoutineEditPage {
     await modal.present();
     const { data } = await modal.onDidDismiss();
     if (data) this.form.addExercise(data.id, data.name, data.demoMediaUrl, data.capabilities);
+  }
+
+  /**
+   * Back handler. When the draft is dirty, prompt "descartar cambios?"
+   * before leaving — matches Hevy's pattern. Clean draft just leaves.
+   * Navigates to the routine detail page (same target the old
+   * ion-back-button had via defaultHref).
+   */
+  protected async cancel(): Promise<void> {
+    if (this.form.dirty()) {
+      const alert = await this.alerts.create({
+        header: '¿Estás seguro de que quieres descartar todos los cambios de la rutina?',
+        buttons: [
+          { text: 'Descartar cambios', role: 'destructive' },
+          { text: 'Cancelar', role: 'cancel' },
+        ],
+      });
+      await alert.present();
+      const { role } = await alert.onDidDismiss();
+      if (role !== 'destructive') return;
+    }
+    this.router.navigate(['/training/routines', this.routineId()]);
   }
 
   protected async save(): Promise<void> {
