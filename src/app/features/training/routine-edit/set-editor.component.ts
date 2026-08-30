@@ -1,6 +1,6 @@
 import {
   ChangeDetectionStrategy, Component, ViewContainerRef,
-  computed, inject, input, output,
+  computed, inject, input, output, signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { IonInput, IonButton } from '@ionic/angular';
@@ -86,6 +86,23 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
       font-size: 0.85em;
       color: var(--ion-color-medium, #888);
     }
+    /* Hint bubble under the input showing the previous value while
+       the field is empty from focus. Absolute so it doesn't shift the
+       row layout; opacity toggle so the appearance is smooth. */
+    .cell { position: relative; }
+    .hint {
+      position: absolute;
+      top: 100%;
+      left: 0; right: 0;
+      text-align: center;
+      font-size: 0.7em;
+      line-height: 1;
+      color: var(--ion-color-medium, #888);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 100ms;
+    }
+    .hint.visible { opacity: 1; }
   `],
   template: `
     <div class="row" [style.grid-template-columns]="gridTemplate()">
@@ -107,14 +124,19 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
            this cell just reflects the currently active mode. Persisted
            target is always kg. -->
       @if (caps().weight) {
-        <ion-input
-          type="text"
-          inputmode="decimal"
-          (ionFocus)="clearOnFocus($event)"
-          [placeholder]="isBricks() ? 'ladr' : 'kg'"
-          [attr.aria-label]="isBricks() ? 'Cantidad de ladrillos' : 'Peso en kg'"
-          [ngModel]="displayedWeight()"
-          (ngModelChange)="onWeightChange($event)" />
+        <div class="cell">
+          <ion-input
+            type="text"
+            inputmode="decimal"
+            (ionFocus)="clearOnFocus('kg', $event)"
+            [placeholder]="isBricks() ? 'ladr' : 'kg'"
+            [attr.aria-label]="isBricks() ? 'Cantidad de ladrillos' : 'Peso en kg'"
+            [ngModel]="displayedWeight()"
+            (ngModelChange)="onWeightChange($event)" />
+          <span class="hint" [class.visible]="focusedField()?.name === 'kg'">
+            {{ focusedField()?.prev }}
+          </span>
+        </div>
       }
 
       <!-- Reps: 1 or 2 inputs sharing a single grid cell. Hidden when
@@ -122,45 +144,65 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
       @if (caps().reps) {
         @if (repsMode() === 'RANGE') {
           <div class="reps-range">
-            <ion-input
-              type="text"
-              inputmode="numeric"
-              (ionFocus)="clearOnFocus($event)"
-              placeholder="min"
-              aria-label="Repeticiones mínimas"
-              [ngModel]="set().targetRepsMin"
-              (ngModelChange)="patch({ targetRepsMin: numeric($event) })" />
+            <div class="cell">
+              <ion-input
+                type="text"
+                inputmode="numeric"
+                (ionFocus)="clearOnFocus('repsMin', $event)"
+                placeholder="min"
+                aria-label="Repeticiones mínimas"
+                [ngModel]="set().targetRepsMin"
+                (ngModelChange)="patch({ targetRepsMin: numeric($event) })" />
+              <span class="hint" [class.visible]="focusedField()?.name === 'repsMin'">
+                {{ focusedField()?.prev }}
+              </span>
+            </div>
             <span class="reps-sep">a</span>
-            <ion-input
-              type="text"
-              inputmode="numeric"
-              (ionFocus)="clearOnFocus($event)"
-              placeholder="max"
-              aria-label="Repeticiones máximas"
-              [ngModel]="set().targetRepsMax"
-              (ngModelChange)="patch({ targetRepsMax: numeric($event) })" />
+            <div class="cell">
+              <ion-input
+                type="text"
+                inputmode="numeric"
+                (ionFocus)="clearOnFocus('repsMax', $event)"
+                placeholder="max"
+                aria-label="Repeticiones máximas"
+                [ngModel]="set().targetRepsMax"
+                (ngModelChange)="patch({ targetRepsMax: numeric($event) })" />
+              <span class="hint" [class.visible]="focusedField()?.name === 'repsMax'">
+                {{ focusedField()?.prev }}
+              </span>
+            </div>
           </div>
         } @else {
-          <ion-input
-            type="text"
-            inputmode="numeric"
-            (ionFocus)="clearOnFocus($event)"
-            placeholder="reps"
-            aria-label="Repeticiones"
-            [ngModel]="set().targetRepsMin"
-            (ngModelChange)="onSingleRepsChange($event)" />
+          <div class="cell">
+            <ion-input
+              type="text"
+              inputmode="numeric"
+              (ionFocus)="clearOnFocus('reps', $event)"
+              placeholder="reps"
+              aria-label="Repeticiones"
+              [ngModel]="set().targetRepsMin"
+              (ngModelChange)="onSingleRepsChange($event)" />
+            <span class="hint" [class.visible]="focusedField()?.name === 'reps'">
+              {{ focusedField()?.prev }}
+            </span>
+          </div>
         }
       }
 
       @if (showRpe() && caps().rpe) {
-        <ion-input
-          type="text"
-          inputmode="decimal"
-          (ionFocus)="clearOnFocus($event)"
-          placeholder="RPE"
-          aria-label="RPE"
-          [ngModel]="set().targetRpe"
-          (ngModelChange)="patch({ targetRpe: numeric($event) })" />
+        <div class="cell">
+          <ion-input
+            type="text"
+            inputmode="decimal"
+            (ionFocus)="clearOnFocus('rpe', $event)"
+            placeholder="RPE"
+            aria-label="RPE"
+            [ngModel]="set().targetRpe"
+            (ngModelChange)="patch({ targetRpe: numeric($event) })" />
+          <span class="hint" [class.visible]="focusedField()?.name === 'rpe'">
+            {{ focusedField()?.prev }}
+          </span>
+        </div>
       }
 
     </div>
@@ -280,37 +322,43 @@ export class SetEditorComponent {
   }
 
   /**
-   * On focus, clear the DOM value (without firing an input event, so
-   * the model keeps the old number). The next keystroke fills a blank
-   * field — same UX as select-all-on-focus but WITHOUT a real
-   * selection, so Chrome Android's ActionMode popup (Traducir/Cortar/
-   * Copiar/Pegar) never appears. Works identically in Capacitor.
-   *
-   * If the user blurs without typing anything, the previous value is
-   * restored so a "tap to inspect" doesn't wipe the set. We detect
-   * "didn't type" with a one-shot input listener and clean both
-   * listeners on blur so there's no leak.
+   * Tracks the currently focused numeric field + the value it had at
+   * focus time. The template reads this to render a dim hint under
+   * the empty input ("preview until you type"). Only one field can be
+   * focused at a time so a single signal suffices.
    */
-  protected async clearOnFocus(ev: Event): Promise<void> {
+  protected readonly focusedField = signal<{ name: string; prev: string } | null>(null);
+
+  /**
+   * On focus, clear the DOM value (without firing an input event, so
+   * the model keeps the old number) and publish { name, prev } so the
+   * hint under the input shows what was there. The next keystroke
+   * clears the hint (input event fires) and fills the field. Blur
+   * without typing restores the value from the snapshot.
+   *
+   * No text selection ever happens, so Chrome Android's ActionMode
+   * popup (Traducir/Cortar/Copiar/Pegar) never appears — works
+   * identically in Capacitor.
+   */
+  protected async clearOnFocus(name: string, ev: Event): Promise<void> {
     const el = ev.target as HTMLIonInputElement | null;
     const native = await el?.getInputElement();
     if (!native) return;
     const prev = native.value;
     native.value = '';
-    let touched = false;
-    const onInput = () => { touched = true; };
+    this.focusedField.set({ name, prev });
+    const onInput = () => this.focusedField.set(null);
     const onBlur = () => {
       native.removeEventListener('input', onInput);
       native.removeEventListener('blur', onBlur);
-      if (!touched && native.value === '') {
+      const wasFocused = this.focusedField()?.name === name;
+      this.focusedField.set(null);
+      if (wasFocused && native.value === '') {
         native.value = prev;
-        // Fire an input event so ngModel + our patchSet flow re-sync
-        // in the (harmless) case where anything upstream changed while
-        // the field was blank.
         native.dispatchEvent(new Event('input', { bubbles: true }));
       }
     };
-    native.addEventListener('input', onInput);
+    native.addEventListener('input', onInput, { once: true });
     native.addEventListener('blur', onBlur);
   }
 
