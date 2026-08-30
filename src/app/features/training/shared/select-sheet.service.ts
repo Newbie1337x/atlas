@@ -67,8 +67,25 @@ export class SelectSheetService {
     ref.setInput('value', config.value);
 
     return new Promise((resolve) => {
+      // Consume the system back gesture: push a history entry so the
+      // next back pop closes the sheet instead of navigating the page.
+      // historyOwned flips false when we cede the entry (either the
+      // user popped it via back, or we pop it ourselves on close).
+      let historyOwned = true;
+      history.pushState({ sheet: 'select' }, '');
+      const popHandler = () => {
+        historyOwned = false;
+        done(null);
+      };
+      window.addEventListener('popstate', popHandler);
+
       const done = (v: string | null) => {
+        window.removeEventListener('popstate', popHandler);
         overlayRef.dispose();
+        if (historyOwned) {
+          historyOwned = false;
+          history.back();
+        }
         resolve(v);
       };
       ref.instance.picked.subscribe(v => done(v));

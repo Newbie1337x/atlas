@@ -191,6 +191,20 @@ export class RestPickerComponent {
     effect(() => this.draft.set(this.value() ?? 0));
   }
 
+  /** Set to true while we own a pushed history entry — the Android
+   *  back gesture / browser back pops that entry and calls our
+   *  popHandler, which closes the sheet instead of navigating the
+   *  page. Cleared when we pop the entry ourselves via history.back
+   *  in dispose(). */
+  private historyPushed = false;
+  private readonly popHandler = () => {
+    // Our pushed state was consumed by the browser — close the sheet
+    // without re-popping (would nav the page back one extra step).
+    this.historyPushed = false;
+    window.removeEventListener('popstate', this.popHandler);
+    this.dispose();
+  };
+
   protected open(): void {
     if (this.overlayRef) return;   // already open
     this.overlayRef = this.overlay.create({
@@ -204,6 +218,12 @@ export class RestPickerComponent {
     });
     this.overlayRef.attach(new TemplatePortal(this.sheetTpl, this.vcr));
     this.overlayRef.backdropClick().subscribe(() => this.cancel());
+
+    // Consume the system back gesture: push a history entry so the
+    // next back pop closes the sheet instead of navigating away.
+    history.pushState({ sheet: 'rest' }, '');
+    this.historyPushed = true;
+    window.addEventListener('popstate', this.popHandler);
 
     // Position the wheel at the current value after Angular has rendered
     // the template into the overlay.
@@ -223,6 +243,15 @@ export class RestPickerComponent {
   private dispose(): void {
     this.overlayRef?.dispose();
     this.overlayRef = null;
+    // If we still own the pushed history entry (Listo / backdrop path),
+    // pop it now so the app's back stack doesn't accumulate extra
+    // entries. When dispose comes FROM popHandler, historyPushed is
+    // already false and we skip.
+    if (this.historyPushed) {
+      this.historyPushed = false;
+      window.removeEventListener('popstate', this.popHandler);
+      history.back();
+    }
   }
 
   private jumpToCurrent(): void {
