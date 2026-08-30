@@ -41,6 +41,20 @@ export default tseslint.config(
       '@typescript-eslint/await-thenable': 'error',
       '@typescript-eslint/require-await': 'warn',
 
+      // Size ceilings — a file/function that crosses the line warns on the
+      // next lint run so a component that started small can't silently
+      // grow into a god. Skip blanks + comments so heavy jsdoc doesn't
+      // count against us. Templates in Angular components inflate LOC
+      // without adding real complexity; when you hit the ceiling: split
+      // a child component out, move the template to .html via
+      // templateUrl, or extract an intent into a shared service.
+      'max-lines': ['warn', {
+        max: 400, skipBlankLines: true, skipComments: true,
+      }],
+      'max-lines-per-function': ['warn', {
+        max: 80, skipBlankLines: true, skipComments: true, IIFEs: true,
+      }],
+
       // Angular naming
       '@angular-eslint/directive-selector': ['error', { type: 'attribute', prefix: 'app', style: 'camelCase' }],
       '@angular-eslint/component-selector': ['error', { type: 'element', prefix: ['app', 'page'], style: 'kebab-case' }],
