@@ -9,7 +9,7 @@ import {
   ActionSheetController, AlertController, ModalController,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { addOutline, ellipsisVertical } from 'ionicons/icons';
+import { addOutline, caretDown, ellipsisVertical } from 'ionicons/icons';
 import { RoutineExercise } from '@core/training/routine.model';
 import { TrainingActionsService } from '@core/training/training-actions.service';
 import { RoutineEditFormService } from './routine-edit-form.service';
@@ -56,7 +56,17 @@ import { ReorderExercisesModalComponent } from './reorder-exercises-modal.compon
       font-size: 0.75em;
       color: var(--ion-color-medium, #666);
       text-transform: uppercase;
+      text-align: center;
     }
+    .reps-header {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      cursor: pointer;
+      color: var(--ion-color-primary, #3880ff);
+    }
+    .reps-header ion-icon { font-size: 0.85em; }
   `],
   template: `
     <ion-card>
@@ -94,10 +104,12 @@ import { ReorderExercisesModalComponent } from './reorder-exercises-modal.compon
           (ngModelChange)="form.updateExerciseNotes(index(), $event)" />
 
         <div class="header-legend" [style.grid-template-columns]="gridTemplate()">
-          <span>Tipo</span>
-          <span>Reps</span>
-          @if (repsMode() === 'range') { <span>Max</span> }
+          <span>Serie</span>
           <span>Kg</span>
+          <span class="reps-header" (click)="openRepsOptions()">
+            {{ repsMode() === 'range' ? 'Rango de reps' : 'Reps' }}
+            <ion-icon name="caret-down" aria-hidden="true" />
+          </span>
           @if (showRpe()) { <span>RPE</span> }
           <span></span>
         </div>
@@ -105,6 +117,7 @@ import { ReorderExercisesModalComponent } from './reorder-exercises-modal.compon
         @for (s of exercise().sets; track $index) {
           <training-set-editor
             [set]="s"
+            [index]="$index"
             [repsMode]="repsMode()"
             [showRpe]="showRpe()"
             (patchSet)="form.updateSet(index(), $index, $event)"
@@ -141,14 +154,15 @@ export class ExerciseEditorComponent {
   protected readonly repsMode = signal<RepsMode>('range');
   protected readonly showRpe = signal<boolean>(false);
 
-  /** Grid template mirrors the set-editor row so the legend + data align. */
+  /** Grid template mirrors the set-editor row so the legend + data
+   *  align: Serie | Kg | Reps | [RPE] | (×). */
   protected readonly gridTemplate = computed(() => {
-    const type = '32px';
-    const reps = this.repsMode() === 'range' ? '60px 1fr' : '1fr';
+    const serie = '48px';
     const kg = '1fr';
+    const reps = this.repsMode() === 'range' ? '1.4fr' : '1fr';
     const rpe = this.showRpe() ? '60px' : '';
     const remove = '32px';
-    return [type, reps, kg, rpe, remove].filter(Boolean).join(' ');
+    return [serie, kg, reps, rpe, remove].filter(Boolean).join(' ');
   });
 
   /** Guards the inference below — once the user opens the menu and
@@ -157,7 +171,7 @@ export class ExerciseEditorComponent {
   private inferred = false;
 
   constructor() {
-    addIcons({ 'add-outline': addOutline, 'ellipsis-vertical': ellipsisVertical });
+    addIcons({ 'add-outline': addOutline, 'caret-down': caretDown, 'ellipsis-vertical': ellipsisVertical });
     // Seed the view preferences from the initial data ONCE. Later set
     // edits (e.g. mirror-write in single mode) must not flip the mode
     // back and forth.
@@ -229,7 +243,7 @@ export class ExerciseEditorComponent {
     await sheet.present();
   }
 
-  private async openRepsOptions(): Promise<void> {
+  protected async openRepsOptions(): Promise<void> {
     const picked = await this.selectSheet.open(this.vcr, {
       header: 'Opciones de repeticiones',
       value: this.repsMode(),

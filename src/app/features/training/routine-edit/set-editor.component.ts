@@ -12,23 +12,23 @@ import { RoutineSet } from '@core/training/routine.model';
 export type RepsMode = 'single' | 'range';
 
 /**
- * One set row inside an exercise editor. Type select + reps input(s) +
- * weight + (optional) RPE + remove.
+ * One set row. Column order matches Hevy: Serie | Kg | Reps | [RPE] | (×).
  *
- * Layout adapts to two exercise-level preferences (passed as inputs):
- *   - repsMode: 'single' collapses reps into one column and mirrors it
- *     into both min/max on write; 'range' keeps the two-column layout.
- *   - showRpe: hides the RPE column when off. Existing values stay on
- *     the row unchanged — the toggle is UI-only.
+ * Serie:
+ *   - WORKING rows display the set number (index + 1).
+ *   - WARMUP / DROP / FAILURE show W / D / F.
+ *   Numbering is a plain index+1 for the MVP — a future refinement is to
+ *   number only among WORKING sets so a warmup as row 0 does not push
+ *   the working numbers up.
+ *
+ * Reps:
+ *   Lives in a single grid cell. In range mode it renders two inputs
+ *   with an "a" separator so 8 a 12 reads inline; in single mode it is
+ *   just one input, and typing there mirrors into both min and max on
+ *   write so the backend keeps consistent "N reps" values.
  *
  * Duration + distance columns are omitted from this compact row — they
- * apply to cardio / timed sets which the MVP does not surface. When we
- * do, they belong in a separate compact-select "kind: strength | cardio"
- * that swaps the visible column set.
- *
- * Emits partial patches; the parent (exercise-editor) forwards to the
- * form service. Zero business logic here beyond mirror-write for single
- * reps.
+ * apply to cardio / timed sets which the MVP does not surface.
  */
 @Component({
   selector: 'training-set-editor',
@@ -48,43 +48,41 @@ export type RepsMode = 'single' | 'range';
     .row ion-input {
       --padding-start: 6px; --padding-end: 6px;
       font-size: 0.9em;
-    }
-    .type-label {
-      font-size: 0.85em;
       text-align: center;
-      color: var(--ion-color-medium, #666);
+    }
+    .serie {
+      text-align: center;
+      font-size: 0.9em;
+      color: var(--ion-color-medium, #888);
+      --min-height: 32px;
+    }
+    .reps-range {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .reps-range ion-input { flex: 1; }
+    .reps-sep {
+      font-size: 0.85em;
+      color: var(--ion-color-medium, #888);
     }
   `],
   template: `
     <div class="row" [style.grid-template-columns]="gridTemplate()">
+      <!-- Serie: dropdown for type. WORKING option shows the row number. -->
       <ion-select
+        class="serie"
         interface="popover"
         [ngModel]="set().setType"
         (ngModelChange)="patch({ setType: $event })"
-        aria-label="Tipo de serie"
-        class="type-label">
-        <ion-select-option value="WORKING">W</ion-select-option>
-        <ion-select-option value="WARMUP">C</ion-select-option>
+        aria-label="Tipo de serie">
+        <ion-select-option value="WORKING">{{ index() + 1 }}</ion-select-option>
+        <ion-select-option value="WARMUP">W</ion-select-option>
         <ion-select-option value="DROP">D</ion-select-option>
         <ion-select-option value="FAILURE">F</ion-select-option>
       </ion-select>
 
-      <ion-input
-        type="number"
-        placeholder="reps"
-        aria-label="Repeticiones"
-        [ngModel]="set().targetRepsMin"
-        (ngModelChange)="onRepsMinChange($event)" />
-
-      @if (repsMode() === 'range') {
-        <ion-input
-          type="number"
-          placeholder="a"
-          aria-label="Repeticiones máximas"
-          [ngModel]="set().targetRepsMax"
-          (ngModelChange)="patch({ targetRepsMax: numeric($event) })" />
-      }
-
+      <!-- Kg -->
       <ion-input
         type="number"
         inputmode="decimal"
@@ -92,6 +90,32 @@ export type RepsMode = 'single' | 'range';
         aria-label="Peso"
         [ngModel]="set().targetWeightKg"
         (ngModelChange)="patch({ targetWeightKg: numeric($event) })" />
+
+      <!-- Reps: 1 or 2 inputs sharing a single grid cell. -->
+      @if (repsMode() === 'range') {
+        <div class="reps-range">
+          <ion-input
+            type="number"
+            placeholder="min"
+            aria-label="Repeticiones mínimas"
+            [ngModel]="set().targetRepsMin"
+            (ngModelChange)="patch({ targetRepsMin: numeric($event) })" />
+          <span class="reps-sep">a</span>
+          <ion-input
+            type="number"
+            placeholder="max"
+            aria-label="Repeticiones máximas"
+            [ngModel]="set().targetRepsMax"
+            (ngModelChange)="patch({ targetRepsMax: numeric($event) })" />
+        </div>
+      } @else {
+        <ion-input
+          type="number"
+          placeholder="reps"
+          aria-label="Repeticiones"
+          [ngModel]="set().targetRepsMin"
+          (ngModelChange)="onSingleRepsChange($event)" />
+      }
 
       @if (showRpe()) {
         <ion-input
@@ -111,32 +135,28 @@ export type RepsMode = 'single' | 'range';
 })
 export class SetEditorComponent {
   readonly set = input.required<RoutineSet>();
+  readonly index = input.required<number>();
   readonly repsMode = input<RepsMode>('range');
   readonly showRpe = input<boolean>(false);
   readonly patchSet = output<Partial<RoutineSet>>();
   readonly remove = output<void>();
 
-  /** Column layout — reflects which optional columns are visible. */
+  /** Column layout matches Hevy: Serie | Kg | Reps | [RPE] | (×). The
+   *  reps cell is one column even in range mode — inputs sit inside it. */
   protected readonly gridTemplate = computed(() => {
-    const type = '32px';
-    const reps = this.repsMode() === 'range' ? '60px 1fr' : '1fr';
+    const serie = '48px';
     const kg = '1fr';
+    const reps = this.repsMode() === 'range' ? '1.4fr' : '1fr';
     const rpe = this.showRpe() ? '60px' : '';
     const remove = '32px';
-    return [type, reps, kg, rpe, remove].filter(Boolean).join(' ');
+    return [serie, kg, reps, rpe, remove].filter(Boolean).join(' ');
   });
 
-  constructor() {
-    addIcons({ 'close-circle': closeCircle });
-  }
-
-  /** In single mode a rep count applies to both min and max so the
-   *  backend treats "10 reps" as an exact target, not a range 10-null. */
-  protected onRepsMinChange(raw: unknown): void {
+  /** Single-mode reps: mirror into both min and max so the backend keeps
+   *  a consistent "N reps" value (not min:N max:null). */
+  protected onSingleRepsChange(raw: unknown): void {
     const n = this.numeric(raw);
-    const patch: Partial<RoutineSet> = { targetRepsMin: n };
-    if (this.repsMode() === 'single') patch.targetRepsMax = n;
-    this.patchSet.emit(patch);
+    this.patchSet.emit({ targetRepsMin: n, targetRepsMax: n });
   }
 
   protected patch(p: Partial<RoutineSet>): void {
@@ -148,5 +168,9 @@ export class SetEditorComponent {
     if (raw == null || raw === '') return null;
     const n = Number(raw);
     return Number.isFinite(n) ? n : null;
+  }
+
+  constructor() {
+    addIcons({ 'close-circle': closeCircle });
   }
 }
