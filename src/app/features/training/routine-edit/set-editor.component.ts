@@ -65,6 +65,18 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
       font-size: 0.9em;
       text-align: center;
     }
+    /* Kill the native number-input spinner arrows in every engine.
+       Ionic's input projects a real <input type="number"> so the
+       browser paints its own increment/decrement UI on top. */
+    .row ion-input input[type='number']::-webkit-inner-spin-button,
+    .row ion-input input[type='number']::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    .row ion-input input[type='number'] {
+      -moz-appearance: textfield;
+      appearance: textfield;
+    }
     .serie {
       --padding-start: 0; --padding-end: 0;
       --padding-top: 0; --padding-bottom: 0;
