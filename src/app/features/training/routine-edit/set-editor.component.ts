@@ -86,23 +86,6 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
       font-size: 0.85em;
       color: var(--ion-color-medium, #888);
     }
-    /* Hint bubble under the input showing the previous value while
-       the field is empty from focus. Absolute so it doesn't shift the
-       row layout; opacity toggle so the appearance is smooth. */
-    .cell { position: relative; }
-    .hint {
-      position: absolute;
-      top: 100%;
-      left: 0; right: 0;
-      text-align: center;
-      font-size: 0.7em;
-      line-height: 1;
-      color: var(--ion-color-medium, #888);
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 100ms;
-    }
-    .hint.visible { opacity: 1; }
   `],
   template: `
     <div class="row" [style.grid-template-columns]="gridTemplate()">
@@ -124,19 +107,14 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
            this cell just reflects the currently active mode. Persisted
            target is always kg. -->
       @if (caps().weight) {
-        <div class="cell">
-          <ion-input
-            type="text"
-            inputmode="decimal"
-            (ionFocus)="clearOnFocus('kg', $event)"
-            [placeholder]="isBricks() ? 'ladr' : 'kg'"
-            [attr.aria-label]="isBricks() ? 'Cantidad de ladrillos' : 'Peso en kg'"
-            [ngModel]="displayedWeight()"
-            (ngModelChange)="onWeightChange($event)" />
-          <span class="hint" [class.visible]="focusedField()?.name === 'kg'">
-            {{ focusedField()?.prev }}
-          </span>
-        </div>
+        <ion-input
+          type="text"
+          inputmode="decimal"
+          (ionFocus)="clearOnFocus('kg', $event)"
+          [placeholder]="placeholderFor('kg', isBricks() ? 'ladr' : 'kg')"
+          [attr.aria-label]="isBricks() ? 'Cantidad de ladrillos' : 'Peso en kg'"
+          [ngModel]="displayedWeight()"
+          (ngModelChange)="onWeightChange($event)" />
       }
 
       <!-- Reps: 1 or 2 inputs sharing a single grid cell. Hidden when
@@ -144,65 +122,45 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
       @if (caps().reps) {
         @if (repsMode() === 'RANGE') {
           <div class="reps-range">
-            <div class="cell">
-              <ion-input
-                type="text"
-                inputmode="numeric"
-                (ionFocus)="clearOnFocus('repsMin', $event)"
-                placeholder="min"
-                aria-label="Repeticiones mínimas"
-                [ngModel]="set().targetRepsMin"
-                (ngModelChange)="patch({ targetRepsMin: numeric($event) })" />
-              <span class="hint" [class.visible]="focusedField()?.name === 'repsMin'">
-                {{ focusedField()?.prev }}
-              </span>
-            </div>
-            <span class="reps-sep">a</span>
-            <div class="cell">
-              <ion-input
-                type="text"
-                inputmode="numeric"
-                (ionFocus)="clearOnFocus('repsMax', $event)"
-                placeholder="max"
-                aria-label="Repeticiones máximas"
-                [ngModel]="set().targetRepsMax"
-                (ngModelChange)="patch({ targetRepsMax: numeric($event) })" />
-              <span class="hint" [class.visible]="focusedField()?.name === 'repsMax'">
-                {{ focusedField()?.prev }}
-              </span>
-            </div>
-          </div>
-        } @else {
-          <div class="cell">
             <ion-input
               type="text"
               inputmode="numeric"
-              (ionFocus)="clearOnFocus('reps', $event)"
-              placeholder="reps"
-              aria-label="Repeticiones"
+              (ionFocus)="clearOnFocus('repsMin', $event)"
+              [placeholder]="placeholderFor('repsMin', 'min')"
+              aria-label="Repeticiones mínimas"
               [ngModel]="set().targetRepsMin"
-              (ngModelChange)="onSingleRepsChange($event)" />
-            <span class="hint" [class.visible]="focusedField()?.name === 'reps'">
-              {{ focusedField()?.prev }}
-            </span>
+              (ngModelChange)="patch({ targetRepsMin: numeric($event) })" />
+            <span class="reps-sep">a</span>
+            <ion-input
+              type="text"
+              inputmode="numeric"
+              (ionFocus)="clearOnFocus('repsMax', $event)"
+              [placeholder]="placeholderFor('repsMax', 'max')"
+              aria-label="Repeticiones máximas"
+              [ngModel]="set().targetRepsMax"
+              (ngModelChange)="patch({ targetRepsMax: numeric($event) })" />
           </div>
+        } @else {
+          <ion-input
+            type="text"
+            inputmode="numeric"
+            (ionFocus)="clearOnFocus('reps', $event)"
+            [placeholder]="placeholderFor('reps', 'reps')"
+            aria-label="Repeticiones"
+            [ngModel]="set().targetRepsMin"
+            (ngModelChange)="onSingleRepsChange($event)" />
         }
       }
 
       @if (showRpe() && caps().rpe) {
-        <div class="cell">
-          <ion-input
-            type="text"
-            inputmode="decimal"
-            (ionFocus)="clearOnFocus('rpe', $event)"
-            placeholder="RPE"
-            aria-label="RPE"
-            [ngModel]="set().targetRpe"
-            (ngModelChange)="patch({ targetRpe: numeric($event) })" />
-          <span class="hint" [class.visible]="focusedField()?.name === 'rpe'">
-            {{ focusedField()?.prev }}
-          </span>
-        </div>
+        <ion-input
+          type="text"
+          inputmode="decimal"
+          (ionFocus)="clearOnFocus('rpe', $event)"
+          [placeholder]="placeholderFor('rpe', 'RPE')"
+          aria-label="RPE"
+          [ngModel]="set().targetRpe"
+          (ngModelChange)="patch({ targetRpe: numeric($event) })" />
       }
 
     </div>
@@ -328,6 +286,14 @@ export class SetEditorComponent {
    * focused at a time so a single signal suffices.
    */
   protected readonly focusedField = signal<{ name: string; prev: string } | null>(null);
+
+  /** While this input is focused-and-empty, its placeholder becomes the
+   *  previous value ("20") instead of the unit hint ("kg") so the user
+   *  still sees what was there. Everywhere else: unit hint. */
+  protected placeholderFor(name: string, fallback: string): string {
+    const f = this.focusedField();
+    return f?.name === name && f.prev ? f.prev : fallback;
+  }
 
   /**
    * On focus, clear the DOM value (without firing an input event, so
