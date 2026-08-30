@@ -65,18 +65,6 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
       font-size: 0.9em;
       text-align: center;
     }
-    /* Kill the native number-input spinner arrows in every engine.
-       Ionic's input projects a real <input type="number"> so the
-       browser paints its own increment/decrement UI on top. */
-    .row ion-input input[type='number']::-webkit-inner-spin-button,
-    .row ion-input input[type='number']::-webkit-outer-spin-button {
-      -webkit-appearance: none;
-      margin: 0;
-    }
-    .row ion-input input[type='number'] {
-      -moz-appearance: textfield;
-      appearance: textfield;
-    }
     .serie {
       --padding-start: 0; --padding-end: 0;
       --padding-top: 0; --padding-bottom: 0;
@@ -120,7 +108,7 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
            target is always kg. -->
       @if (caps().weight) {
         <ion-input
-          type="number"
+          type="text"
           inputmode="decimal"
           [placeholder]="isBricks() ? 'ladr' : 'kg'"
           [attr.aria-label]="isBricks() ? 'Cantidad de ladrillos' : 'Peso en kg'"
@@ -134,14 +122,16 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
         @if (repsMode() === 'RANGE') {
           <div class="reps-range">
             <ion-input
-              type="number"
+              type="text"
+              inputmode="numeric"
               placeholder="min"
               aria-label="Repeticiones mínimas"
               [ngModel]="set().targetRepsMin"
               (ngModelChange)="patch({ targetRepsMin: numeric($event) })" />
             <span class="reps-sep">a</span>
             <ion-input
-              type="number"
+              type="text"
+              inputmode="numeric"
               placeholder="max"
               aria-label="Repeticiones máximas"
               [ngModel]="set().targetRepsMax"
@@ -149,7 +139,8 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
           </div>
         } @else {
           <ion-input
-            type="number"
+            type="text"
+            inputmode="numeric"
             placeholder="reps"
             aria-label="Repeticiones"
             [ngModel]="set().targetRepsMin"
@@ -159,7 +150,7 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
 
       @if (showRpe() && caps().rpe) {
         <ion-input
-          type="number"
+          type="text"
           inputmode="decimal"
           placeholder="RPE"
           aria-label="RPE"
