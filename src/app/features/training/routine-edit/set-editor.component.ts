@@ -3,11 +3,7 @@ import {
   computed, inject, input, output,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import {
-  IonInput, IonButton, IonIcon,
-} from '@ionic/angular';
-import { addIcons } from 'ionicons';
-import { closeCircle } from 'ionicons/icons';
+import { IonInput, IonButton } from '@ionic/angular';
 import { ExerciseCapabilities, RepsMode, RoutineSet, SetType } from '@core/training/routine.model';
 import { InputMode } from '@core/training/exercise.model';
 import { SelectSheetService, SelectSheetOption } from '../shared/select-sheet.service';
@@ -55,7 +51,7 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
-    IonInput, IonButton, IonIcon,
+    IonInput, IonButton,
   ],
   styles: [`
     .row {
@@ -159,9 +155,6 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
           (ngModelChange)="patch({ targetRpe: numeric($event) })" />
       }
 
-      <ion-button fill="clear" size="small" (click)="remove.emit()" aria-label="Quitar serie">
-        <ion-icon slot="icon-only" name="close-circle" color="danger" />
-      </ion-button>
     </div>
   `,
 })
@@ -243,8 +236,7 @@ export class SetEditorComponent {
       ? (this.repsMode() === 'RANGE' ? '1.4fr' : '1fr')
       : '';
     const rpe = (this.showRpe() && c.rpe) ? '60px' : '';
-    const remove = '32px';
-    return [serie, kg, reps, rpe, remove].filter(Boolean).join(' ');
+    return [serie, kg, reps, rpe].filter(Boolean).join(' ');
   });
 
   /** Single-mode reps: mirror into both min and max so the backend keeps
@@ -286,7 +278,4 @@ export class SetEditorComponent {
     return Number.isFinite(n) ? n : null;
   }
 
-  constructor() {
-    addIcons({ 'close-circle': closeCircle });
-  }
 }
