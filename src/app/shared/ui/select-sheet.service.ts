@@ -85,12 +85,13 @@ export class SelectSheetService {
         if (closing) return;   // guard against double-fire (backdrop + drag race)
         closing = true;
         window.removeEventListener('popstate', popHandler);
-        // Detach the CDK backdrop AND kill the sheet's own pointer
-        // events immediately — otherwise the still-present backdrop
+        // Detach the CDK backdrop AND kill the overlay pane's pointer
+        // events immediately — otherwise the still-present pane
+        // (.cdk-overlay-pane has pointer-events: auto by default)
         // eats the tap that opens the next sheet during the 220ms
         // close animation (the "second tap needed" bug).
         overlayRef.detachBackdrop();
-        ref.location.nativeElement.style.pointerEvents = 'none';
+        overlayRef.overlayElement.style.pointerEvents = 'none';
         // Pop our history entry synchronously BEFORE the close animation
         // starts. Otherwise history.back() lands 220ms later and its
         // popstate can dismiss a sheet the user opened in the meantime.
