@@ -12,23 +12,16 @@ import { REST_OPTIONS, formatRestSeconds } from './rest-values';
 /**
  * Rest-duration picker with a bottom-sheet wheel.
  *
- * Uses CDK Overlay for the sheet: the portal appends to document.body
- * so no transformed ancestor (ion-router-outlet / ion-card use CSS
- * transforms) can clip a position:fixed inside our own template.
- * ion-modal was tried three times and kept getting stuck (`display:none`,
- * `overlay-hidden` stayed, `.present()` hung); ion-picker breaks inside
- * a breakpoint modal on its own. Rolling our own on top of CDK is
- * boring, works, keeps us out of framework quirks.
+ * The sheet lives in a CDK Overlay so the portal escapes any
+ * transformed ancestor (ion-router-outlet + ion-card use transforms,
+ * which trap position:fixed). ion-modal / ion-picker both hit Ionic 9
+ * bugs when nested here — CDK is boring and works.
  *
- * Interaction:
- *   - Tap trigger → sheet slides up from the bottom.
- *   - Backdrop tap / grabber tap → cancel (discard, keep prior value).
- *   - Wheel: CSS scroll-snap. The row snapped to the middle is the
- *     "draft"; it grows + tints on center-hover.
- *   - Listo → emit the draft (0 becomes null) and close.
+ * Wheel is CSS scroll-snap. The row centered under the highlight bar
+ * is the draft; Listo emits it (0 → null), backdrop tap cancels.
  *
- * Contract: `value` in (nullable seconds), `valueChange` out. Reusable
- * — session tracker in Slice 4 drops it in for per-set rest overrides.
+ * Contract: `value` in (nullable seconds), `valueChange` out. Reusable —
+ * the session tracker in Slice 4 drops it in for per-set rest overrides.
  */
 @Component({
   selector: 'training-rest-picker',
