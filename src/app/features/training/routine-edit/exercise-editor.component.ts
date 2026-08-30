@@ -208,13 +208,18 @@ export class ExerciseEditorComponent {
     this.exercise().capabilities ?? PERMISSIVE_CAPS);
 
   /**
-   * 1-based ordinal per set among ONLY WORKING sets — non-working rows
-   * get 0 (they render W/D/F). Lets the set-editor number 1,2,3 even
-   * when preceded by warmup rows: [W W 1 2 3] instead of [W W 3 4 5].
+   * The number this row would carry if it were WORKING. Current WORKING
+   * rows get their own ordinal (1..N); non-working rows get the number
+   * they would take if switched — so the "WORKING" option in the
+   * dropdown previews the right label instead of a stale array index.
+   *
+   * Example [W W W]: opening any row's dropdown shows WORKING = 1 (all
+   * three would be the first working). [W WORKING W]: rows are 1 / 1 / 2.
    */
   protected readonly workingOrdinals = computed<number[]>(() => {
     let n = 0;
-    return this.exercise().sets.map(s => s.setType === 'WORKING' ? ++n : 0);
+    return this.exercise().sets.map(s =>
+      s.setType === 'WORKING' ? ++n : n + 1);
   });
 
   /** Show-RPE stays a local UI-only signal — no domain field. Seeded
