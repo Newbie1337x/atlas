@@ -14,7 +14,11 @@ export interface SelectSheetOption {
   /** Short glyph (letter/number/emoji) rendered as a colored chip
    *  before the label — mirrors Hevy's set-type picker. Optional. */
   leading?: string;
-  /** CSS color for the leading chip. Defaults to text color. */
+  /** Ionicon name — takes precedence over `leading` when both are set.
+   *  The consumer is responsible for calling addIcons({...}) for the
+   *  icon at least once in the app lifetime. */
+  leadingIcon?: string;
+  /** CSS color for the leading chip / icon. Defaults to text color. */
   leadingColor?: string;
   /** Renders the row in a destructive color (red). Use for actions
    *  like "Eliminar" that don't just pick a value. */
@@ -130,6 +134,7 @@ export class SelectSheetService {
       font-weight: 700;
       font-size: 0.95em;
     }
+    .opt-leading-ic { font-size: 1.15rem; }
     .opt-label { flex: 1; }
     .opt-check { color: var(--ion-color-primary, #3880ff); font-size: 1.2em; }
     @keyframes slide-up {
@@ -151,7 +156,13 @@ export class SelectSheetService {
           class="opt"
           [class.destructive]="opt.destructive"
           (click)="picked.emit(opt.value)">
-          @if (opt.leading) {
+          @if (opt.leadingIcon) {
+            <ion-icon
+              class="opt-leading opt-leading-ic"
+              [name]="opt.leadingIcon"
+              [style.color]="opt.leadingColor || null"
+              aria-hidden="true" />
+          } @else if (opt.leading) {
             <span class="opt-leading" [style.color]="opt.leadingColor || null">
               {{ opt.leading }}
             </span>

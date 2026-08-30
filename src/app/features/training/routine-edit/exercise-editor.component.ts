@@ -9,7 +9,10 @@ import {
   ActionSheetController, AlertController, ModalController,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { addOutline, caretDown, ellipsisVertical } from 'ionicons/icons';
+import {
+  addOutline, caretDown, ellipsisVertical,
+  repeatOutline, resizeOutline,
+} from 'ionicons/icons';
 import { firstValueFrom } from 'rxjs';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import {
@@ -242,7 +245,11 @@ export class ExerciseEditorComponent {
   private rpeInferred = false;
 
   constructor() {
-    addIcons({ 'add-outline': addOutline, 'caret-down': caretDown, 'ellipsis-vertical': ellipsisVertical });
+    addIcons({
+      'add-outline': addOutline, 'caret-down': caretDown,
+      'ellipsis-vertical': ellipsisVertical,
+      'repeat-outline': repeatOutline, 'resize-outline': resizeOutline,
+    });
     effect(() => {
       const ex = this.exercise();
       if (this.rpeInferred) return;
@@ -314,8 +321,10 @@ export class ExerciseEditorComponent {
       subtitle: this.exercise().exerciseName ?? '',
       value: this.repsMode(),
       options: [
-        { label: 'Repeticiones',          value: 'SINGLE' },
-        { label: 'Rango de repeticiones', value: 'RANGE' },
+        { label: 'Repeticiones',          value: 'SINGLE',
+          leadingIcon: 'repeat-outline' },
+        { label: 'Rango de repeticiones', value: 'RANGE',
+          leadingIcon: 'resize-outline' },
       ],
     });
     if (picked === 'SINGLE' || picked === 'RANGE') this.setRepsMode(picked);
