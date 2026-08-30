@@ -212,18 +212,21 @@ export class ExerciseEditorComponent {
     this.exercise().exerciseName ?? '');
 
   /**
-   * The number this row would carry if it were WORKING. Current WORKING
-   * rows get their own ordinal (1..N); non-working rows get the number
-   * they would take if switched — so the "WORKING" option in the
-   * dropdown previews the right label instead of a stale array index.
+   * The number this row would carry if it were WORKING. Only WARMUP
+   * rows sit outside the count (they render "W" and don't advance the
+   * ordinal); WORKING, DROP_SET and FAILURE all consume a slot since
+   * they're real working effort. So [WORKING, FAILURE, WORKING]
+   * renders as [1, F, 3] — the FAILURE row shows "F" via its glyph
+   * but still occupies slot 2.
    *
-   * Example [W W W]: opening any row's dropdown shows WORKING = 1 (all
-   * three would be the first working). [W WORKING W]: rows are 1 / 1 / 2.
+   * For a non-working row the number returned is "what it would take
+   * if switched to WORKING" so the dropdown preview shows the right
+   * label. Example [W W W]: all three preview WORKING=1.
    */
   protected readonly workingOrdinals = computed<number[]>(() => {
     let n = 0;
     return this.exercise().sets.map(s =>
-      s.setType === 'WORKING' ? ++n : n + 1);
+      s.setType === 'WARMUP' ? n + 1 : ++n);
   });
 
   /** Show-RPE stays a local UI-only signal — no domain field. Seeded
