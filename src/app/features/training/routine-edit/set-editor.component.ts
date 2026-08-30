@@ -8,7 +8,7 @@ import {
   ExerciseCapabilities, PERMISSIVE_CAPS, RepsMode, RoutineSet, SetType,
 } from '@core/training/routine.model';
 import { InputMode } from '@core/training/exercise.model';
-import { SelectSheetService, SelectSheetOption } from '../shared/select-sheet.service';
+import { SelectSheetService, SelectSheetOption } from '@shared/ui/select-sheet.service';
 import { RoutineEditFormService } from './routine-edit-form.service';
 
 /** Wildly permissive default when the parent has not yet resolved the

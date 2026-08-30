@@ -28,7 +28,7 @@ import { SetEditorComponent } from './set-editor.component';
 import { WeightModePickerService } from '../shared/weight-mode-picker.service';
 import { ExerciseIconComponent } from '../shared/exercise-icon.component';
 import { RestPickerComponent } from '../shared/rest-picker.component';
-import { SelectSheetService } from '../shared/select-sheet.service';
+import { SelectSheetService } from '@shared/ui/select-sheet.service';
 import { ReorderExercisesModalComponent } from './reorder-exercises-modal.component';
 
 /**

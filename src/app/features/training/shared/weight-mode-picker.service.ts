@@ -5,7 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import { InputMode } from '@core/training/exercise.model';
 import { TrainingApi } from '@core/training/training.api';
 import { trainingKeys } from '@core/training/training.keys';
-import { SelectSheetService } from './select-sheet.service';
+import { SelectSheetService } from '@shared/ui/select-sheet.service';
 
 /**
  * Opens the KG vs BRICKS picker for one exercise and, when needed, an

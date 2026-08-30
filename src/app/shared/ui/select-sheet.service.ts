@@ -40,7 +40,8 @@ interface SelectSheetConfig {
  * from imperative code — an ActionSheet handler, a menu callback, etc.
  * Returns the picked value via Promise or `null` on backdrop dismiss.
  *
- * Uses CDK Overlay for the same reason the rest picker does: portal to
+ * App-wide primitive: any feature imports it from @shared/ui — same
+ * bottom-sheet look everywhere. Uses CDK Overlay so the portal to
  * document.body escapes transformed ancestors (ion-router-outlet,
  * ion-card) that would otherwise clip a position:fixed sheet.
  *
