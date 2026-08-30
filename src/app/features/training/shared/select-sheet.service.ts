@@ -103,7 +103,7 @@ export class SelectSheetService {
       margin: 8px 0 4px;
     }
     .sheet-header {
-      padding: 12px 16px;
+      padding: 18px 20px 16px;
       text-align: center;
       border-bottom: 1px solid var(--ion-color-step-150, rgba(255, 255, 255, 0.08));
     }
@@ -117,7 +117,7 @@ export class SelectSheetService {
     .opt {
       display: flex;
       align-items: center;
-      padding: 14px 20px;
+      padding: 18px 24px;
       font-size: 1rem;
       border-bottom: 1px solid var(--ion-color-step-100, rgba(255, 255, 255, 0.04));
       cursor: pointer;
