@@ -94,11 +94,14 @@ export class SelectSheetService {
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      /* Extra room below the last option + safe-area for the gesture
-         bar / iOS notch. Without this the last row hugs the bottom
-         edge and (on some viewports) the sheet doesn't quite reach
-         the bottom of the screen, leaving a white/black seam. */
-      padding-bottom: max(env(safe-area-inset-bottom), 20px);
+      /* Bleed 60px past the CDK overlay's bottom edge so the dark
+         background covers any gap Chrome Android leaves for its URL
+         bar / gesture area — no white seam. margin-bottom pulls the
+         sheet's own box 60px lower; padding-bottom keeps the last
+         option 60px + safe-area away from where the screen actually
+         ends so it still looks like a normal roomy bottom sheet. */
+      margin-bottom: -60px;
+      padding-bottom: calc(max(env(safe-area-inset-bottom), 20px) + 60px);
     }
     .grabber {
       align-self: center;
@@ -127,7 +130,6 @@ export class SelectSheetService {
       border-bottom: 1px solid var(--ion-color-step-100, rgba(255, 255, 255, 0.04));
       cursor: pointer;
     }
-    .opt:last-child { border-bottom: 0; }
     .opt:active { background: var(--ion-color-step-100, rgba(255, 255, 255, 0.06)); }
     .opt.destructive { color: var(--ion-color-danger, #eb445a); }
     .opt-leading {
