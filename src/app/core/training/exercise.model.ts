@@ -4,6 +4,8 @@
  * Used by the routine editor's exercise picker; nothing else in the
  * training module needs the full catalog shape today.
  */
+import { ExerciseCapabilities } from './routine.model';
+
 export interface CatalogExercise {
   id: number;
   organizationId: number | null;
@@ -14,4 +16,5 @@ export interface CatalogExercise {
   secondaryMuscles: string[];
   demoMediaUrl: string | null;
   isCustom: boolean;
+  capabilities: ExerciseCapabilities;
 }

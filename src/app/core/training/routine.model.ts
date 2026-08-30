@@ -14,10 +14,28 @@
 export type RoutineOwnerType = 'MEMBER' | 'TEMPLATE' | 'COACH';
 
 /** Mirrors backend SetType enum. */
-export type SetType = 'WARMUP' | 'WORKING' | 'DROP' | 'FAILURE';
+export type SetType = 'WARMUP' | 'NORMAL' | 'WORKING' | 'FAILURE' | 'DROP_SET';
 
 /** How reps are edited for the exercise. Persisted per exercise; default SINGLE. */
 export type RepsMode = 'SINGLE' | 'RANGE';
+
+/**
+ * Which target fields make sense for an exercise — derived server-side
+ * from ExerciseType + EquipmentType and shipped as-is. The frontend
+ * uses it to gate inputs (hide weight on bodyweight, hide bricks on
+ * barbell, hide DROP_SET from the set-type select when weight is off).
+ * The backend enforces the same rules on write via ExerciseCapabilityGuard.
+ */
+export interface ExerciseCapabilities {
+  weight: boolean;
+  reps: boolean;
+  duration: boolean;
+  distance: boolean;
+  rpe: boolean;
+  bricks: boolean;
+  /** Serialized as an array by Jackson (backend Set). */
+  allowedSetTypes: SetType[];
+}
 
 export interface ExercisePreview {
   exerciseId: number;
@@ -57,7 +75,7 @@ export interface RoutineSet {
   targetRpe: number | null;
 }
 
-/** One exercise in a routine (enriched with name + iconUrl). */
+/** One exercise in a routine (enriched with name + iconUrl + capabilities). */
 export interface RoutineExercise {
   id: number;
   orderIndex: number;
@@ -68,6 +86,8 @@ export interface RoutineExercise {
   supersetGroupId: string | null;
   notes: string | null;
   repsMode: RepsMode;
+  /** Nullable in the wire format — legacy responses / null exercise metadata. */
+  capabilities: ExerciseCapabilities | null;
   sets: RoutineSet[];
 }
 

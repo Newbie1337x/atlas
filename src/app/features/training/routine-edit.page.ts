@@ -129,7 +129,7 @@ export class RoutineEditPage {
     const modal = await this.modal.create({ component: ExercisePickerComponent });
     await modal.present();
     const { data } = await modal.onDidDismiss();
-    if (data) this.form.addExercise(data.id, data.name, data.demoMediaUrl);
+    if (data) this.form.addExercise(data.id, data.name, data.demoMediaUrl, data.capabilities);
   }
 
   protected async save(): Promise<void> {

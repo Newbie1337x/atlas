@@ -5,7 +5,16 @@ import {
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { closeCircle } from 'ionicons/icons';
-import { RepsMode, RoutineSet } from '@core/training/routine.model';
+import { ExerciseCapabilities, RepsMode, RoutineSet } from '@core/training/routine.model';
+
+/** Wildly permissive default when the parent has not yet resolved the
+ *  exercise's capabilities from the backend (older routines missing the
+ *  computed field). Prefer showing every input over silently hiding one. */
+const PERMISSIVE_CAPS: ExerciseCapabilities = {
+  weight: true, reps: true, duration: false, distance: false,
+  rpe: true, bricks: false,
+  allowedSetTypes: ['WORKING', 'WARMUP', 'NORMAL', 'DROP_SET', 'FAILURE'],
+};
 
 /**
  * One set row. Column order matches Hevy: Serie | Kg | Reps | [RPE] | (×).
@@ -65,55 +74,61 @@ import { RepsMode, RoutineSet } from '@core/training/routine.model';
   `],
   template: `
     <div class="row" [style.grid-template-columns]="gridTemplate()">
-      <!-- Serie: dropdown for type. WORKING option shows the row number. -->
+      <!-- Serie: dropdown filtered to allowed set types (WORKING option
+           shows the row number). -->
       <ion-select
         class="serie"
         interface="popover"
         [ngModel]="set().setType"
         (ngModelChange)="patch({ setType: $event })"
         aria-label="Tipo de serie">
-        <ion-select-option value="WORKING">{{ index() + 1 }}</ion-select-option>
-        <ion-select-option value="WARMUP">W</ion-select-option>
-        <ion-select-option value="DROP">D</ion-select-option>
-        <ion-select-option value="FAILURE">F</ion-select-option>
+        @for (opt of typeOptions(); track opt.value) {
+          <ion-select-option [value]="opt.value">{{ opt.label }}</ion-select-option>
+        }
       </ion-select>
 
-      <!-- Kg -->
-      <ion-input
-        type="number"
-        inputmode="decimal"
-        placeholder="kg"
-        aria-label="Peso"
-        [ngModel]="set().targetWeightKg"
-        (ngModelChange)="patch({ targetWeightKg: numeric($event) })" />
-
-      <!-- Reps: 1 or 2 inputs sharing a single grid cell. -->
-      @if (repsMode() === 'RANGE') {
-        <div class="reps-range">
-          <ion-input
-            type="number"
-            placeholder="min"
-            aria-label="Repeticiones mínimas"
-            [ngModel]="set().targetRepsMin"
-            (ngModelChange)="patch({ targetRepsMin: numeric($event) })" />
-          <span class="reps-sep">a</span>
-          <ion-input
-            type="number"
-            placeholder="max"
-            aria-label="Repeticiones máximas"
-            [ngModel]="set().targetRepsMax"
-            (ngModelChange)="patch({ targetRepsMax: numeric($event) })" />
-        </div>
-      } @else {
+      <!-- Kg — hidden entirely when the exercise doesn't support weight
+           (bodyweight-only, cardio, band-only). -->
+      @if (caps().weight) {
         <ion-input
           type="number"
-          placeholder="reps"
-          aria-label="Repeticiones"
-          [ngModel]="set().targetRepsMin"
-          (ngModelChange)="onSingleRepsChange($event)" />
+          inputmode="decimal"
+          placeholder="kg"
+          aria-label="Peso"
+          [ngModel]="set().targetWeightKg"
+          (ngModelChange)="patch({ targetWeightKg: numeric($event) })" />
       }
 
-      @if (showRpe()) {
+      <!-- Reps: 1 or 2 inputs sharing a single grid cell. Hidden when
+           the exercise is duration/distance-only. -->
+      @if (caps().reps) {
+        @if (repsMode() === 'RANGE') {
+          <div class="reps-range">
+            <ion-input
+              type="number"
+              placeholder="min"
+              aria-label="Repeticiones mínimas"
+              [ngModel]="set().targetRepsMin"
+              (ngModelChange)="patch({ targetRepsMin: numeric($event) })" />
+            <span class="reps-sep">a</span>
+            <ion-input
+              type="number"
+              placeholder="max"
+              aria-label="Repeticiones máximas"
+              [ngModel]="set().targetRepsMax"
+              (ngModelChange)="patch({ targetRepsMax: numeric($event) })" />
+          </div>
+        } @else {
+          <ion-input
+            type="number"
+            placeholder="reps"
+            aria-label="Repeticiones"
+            [ngModel]="set().targetRepsMin"
+            (ngModelChange)="onSingleRepsChange($event)" />
+        }
+      }
+
+      @if (showRpe() && caps().rpe) {
         <ion-input
           type="number"
           inputmode="decimal"
@@ -134,16 +149,35 @@ export class SetEditorComponent {
   readonly index = input.required<number>();
   readonly repsMode = input<RepsMode>('SINGLE');
   readonly showRpe = input<boolean>(false);
+  readonly capabilities = input<ExerciseCapabilities | null>(null);
   readonly patchSet = output<Partial<RoutineSet>>();
   readonly remove = output<void>();
 
-  /** Column layout matches Hevy: Serie | Kg | Reps | [RPE] | (×). The
-   *  reps cell is one column even in range mode — inputs sit inside it. */
+  /** Resolved caps — never null in the template; falls back permissively. */
+  protected readonly caps = computed(() => this.capabilities() ?? PERMISSIVE_CAPS);
+
+  /** Set-type options the backend guard will actually accept for this exercise. */
+  protected readonly typeOptions = computed(() => {
+    const allowed = new Set(this.caps().allowedSetTypes);
+    return [
+      { value: 'WORKING', label: `${this.index() + 1}` },
+      { value: 'WARMUP',  label: 'W' },
+      { value: 'DROP_SET', label: 'D' },
+      { value: 'FAILURE',  label: 'F' },
+    ].filter(o => allowed.has(o.value as never));
+  });
+
+  /** Column layout: Serie | [Kg] | [Reps] | [RPE] | (×). Any of the
+   *  three middle columns collapses out of the grid entirely when the
+   *  exercise's capabilities do not support it. */
   protected readonly gridTemplate = computed(() => {
+    const c = this.caps();
     const serie = '48px';
-    const kg = '1fr';
-    const reps = this.repsMode() === 'RANGE' ? '1.4fr' : '1fr';
-    const rpe = this.showRpe() ? '60px' : '';
+    const kg = c.weight ? '1fr' : '';
+    const reps = c.reps
+      ? (this.repsMode() === 'RANGE' ? '1.4fr' : '1fr')
+      : '';
+    const rpe = (this.showRpe() && c.rpe) ? '60px' : '';
     const remove = '32px';
     return [serie, kg, reps, rpe, remove].filter(Boolean).join(' ');
   });

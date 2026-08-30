@@ -14,7 +14,15 @@ import { RoutineExercise } from '@core/training/routine.model';
 import { TrainingActionsService } from '@core/training/training-actions.service';
 import { RoutineEditFormService } from './routine-edit-form.service';
 import { SetEditorComponent } from './set-editor.component';
-import { RepsMode } from '@core/training/routine.model';
+import { ExerciseCapabilities, RepsMode } from '@core/training/routine.model';
+
+/** Permissive default so the editor renders every input if the backend
+ *  didn't ship capabilities (legacy routine, missing exercise metadata). */
+const PERMISSIVE_CAPS: ExerciseCapabilities = {
+  weight: true, reps: true, duration: false, distance: false,
+  rpe: true, bricks: false,
+  allowedSetTypes: ['WORKING', 'WARMUP', 'NORMAL', 'DROP_SET', 'FAILURE'],
+};
 import { ExerciseIconComponent } from '../shared/exercise-icon.component';
 import { RestPickerComponent } from '../shared/rest-picker.component';
 import { SelectSheetService } from '../shared/select-sheet.service';
@@ -106,12 +114,14 @@ import { ReorderExercisesModalComponent } from './reorder-exercises-modal.compon
 
         <div class="header-legend" [style.grid-template-columns]="gridTemplate()">
           <span>Serie</span>
-          <span>Kg</span>
-          <span class="reps-header" (click)="openRepsOptions()">
-            {{ repsMode() === 'RANGE' ? 'Rango de reps' : 'Reps' }}
-            <ion-icon name="caret-down" aria-hidden="true" />
-          </span>
-          @if (showRpe()) { <span>RPE</span> }
+          @if (caps().weight) { <span>Kg</span> }
+          @if (caps().reps) {
+            <span class="reps-header" (click)="openRepsOptions()">
+              {{ repsMode() === 'RANGE' ? 'Rango de reps' : 'Reps' }}
+              <ion-icon name="caret-down" aria-hidden="true" />
+            </span>
+          }
+          @if (showRpe() && caps().rpe) { <span>RPE</span> }
           <span></span>
         </div>
 
@@ -121,6 +131,7 @@ import { ReorderExercisesModalComponent } from './reorder-exercises-modal.compon
             [index]="$index"
             [repsMode]="repsMode()"
             [showRpe]="showRpe()"
+            [capabilities]="caps()"
             (patchSet)="form.updateSet(index(), $index, $event)"
             (remove)="form.removeSet(index(), $index)" />
         }
@@ -149,18 +160,26 @@ export class ExerciseEditorComponent {
    *  as a computed keeps the template reactive to draft mutations. */
   protected readonly repsMode = computed<RepsMode>(() => this.exercise().repsMode);
 
+  /** Server-computed input matrix for this exercise; falls back permissive. */
+  protected readonly caps = computed<ExerciseCapabilities>(() =>
+    this.exercise().capabilities ?? PERMISSIVE_CAPS);
+
   /** Show-RPE stays a local UI-only signal — no domain field. Seeded
    *  from data once so exercises that already carry an RPE reveal the
    *  column; from there the user's toggle wins for the session. */
   protected readonly showRpe = signal<boolean>(false);
 
-  /** Grid template mirrors the set-editor row so the legend + data
-   *  align: Serie | Kg | Reps | [RPE] | (×). */
+  /** Grid template mirrors the set-editor row: Serie | [Kg] | [Reps] |
+   *  [RPE] | (×). Middle columns collapse when caps say the exercise
+   *  doesn't support them. */
   protected readonly gridTemplate = computed(() => {
+    const c = this.caps();
     const serie = '48px';
-    const kg = '1fr';
-    const reps = this.repsMode() === 'RANGE' ? '1.4fr' : '1fr';
-    const rpe = this.showRpe() ? '60px' : '';
+    const kg = c.weight ? '1fr' : '';
+    const reps = c.reps
+      ? (this.repsMode() === 'RANGE' ? '1.4fr' : '1fr')
+      : '';
+    const rpe = (this.showRpe() && c.rpe) ? '60px' : '';
     const remove = '32px';
     return [serie, kg, reps, rpe, remove].filter(Boolean).join(' ');
   });

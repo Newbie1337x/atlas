@@ -1,6 +1,6 @@
 import { Injectable, computed, signal } from '@angular/core';
 import {
-  RepsMode, RoutineDetail, RoutineExercise, RoutineSet, SetType,
+  ExerciseCapabilities, RepsMode, RoutineDetail, RoutineExercise, RoutineSet, SetType,
 } from '@core/training/routine.model';
 
 /**
@@ -40,8 +40,17 @@ export class RoutineEditFormService {
 
   // ---------- Exercises ----------
 
-  /** Append an exercise with one empty WORKING set. */
-  addExercise(exerciseId: number, exerciseName: string, iconUrl: string | null): void {
+  /**
+   * Append an exercise with one empty WORKING set. Capabilities come from
+   * the catalog (picker attaches them); passing null is fine — the editor
+   * falls back to a permissive default until save + refetch fills it.
+   */
+  addExercise(
+    exerciseId: number,
+    exerciseName: string,
+    iconUrl: string | null,
+    capabilities: ExerciseCapabilities | null = null,
+  ): void {
     this.patch(d => {
       const nextOrder = d.exercises.length;
       return {
@@ -58,6 +67,7 @@ export class RoutineEditFormService {
             supersetGroupId: null,
             notes: null,
             repsMode: 'SINGLE',
+            capabilities,
             sets: [emptySet(0)],
           },
         ],
