@@ -256,22 +256,21 @@ export class ExerciseEditorComponent {
   }
 
   /**
-   * When switching TO single mode, mirror every set's max into its min
-   * so the backend sees consistent "N reps" values (min===max). When
-   * switching TO range, leave the data as-is — user can widen max
-   * per-set from there.
+   * Mode is a pure UI preference — it changes which inputs are visible,
+   * never the underlying data. If the row already has min !== max
+   * (range values) and the user picks single, the max survives on the
+   * record; only when the user actually types into the single input
+   * does the mirror-write in set-editor collapse min === max.
+   *
+   * Side effect: after switching to single without editing anything,
+   * saving preserves the range; on the next open we infer range again
+   * from the data. Honest to what the user typed originally. If they
+   * really wanted single, they retype the reps and the mirror-write
+   * kicks in.
    */
   private setRepsMode(mode: RepsMode): void {
     if (this.repsMode() === mode) return;
     this.repsMode.set(mode);
-    if (mode === 'single') {
-      const ex = this.exercise();
-      ex.sets.forEach((s, i) => {
-        if (s.targetRepsMin !== s.targetRepsMax) {
-          this.form.updateSet(this.index(), i, { targetRepsMax: s.targetRepsMin });
-        }
-      });
-    }
   }
 
   private toggleRpe(): void {
