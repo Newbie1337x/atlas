@@ -6,12 +6,13 @@ import { FormsModule } from '@angular/forms';
 import {
   IonCard, IonCardHeader, IonCardTitle, IonCardContent,
   IonButton, IonIcon, IonInput,
-  ActionSheetController, AlertController, ModalController,
+  AlertController, ModalController,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import {
   addOutline, caretDown, ellipsisVertical,
-  repeatOutline, resizeOutline,
+  repeatOutline, resizeOutline, reorderThreeOutline, swapHorizontalOutline,
+  linkOutline, speedometerOutline, trashOutline,
 } from 'ionicons/icons';
 import { firstValueFrom } from 'rxjs';
 import { injectQuery } from '@tanstack/angular-query-experimental';
@@ -165,7 +166,6 @@ export class ExerciseEditorComponent {
   readonly index = input.required<number>();
 
   protected readonly form = inject(RoutineEditFormService);
-  private readonly sheets = inject(ActionSheetController);
   private readonly alerts = inject(AlertController);
   private readonly modal = inject(ModalController);
   private readonly actions = inject(TrainingActionsService);
@@ -258,6 +258,10 @@ export class ExerciseEditorComponent {
       'add-outline': addOutline, 'caret-down': caretDown,
       'ellipsis-vertical': ellipsisVertical,
       'repeat-outline': repeatOutline, 'resize-outline': resizeOutline,
+      'reorder-three-outline': reorderThreeOutline,
+      'swap-horizontal-outline': swapHorizontalOutline,
+      'link-outline': linkOutline, 'speedometer-outline': speedometerOutline,
+      'trash-outline': trashOutline,
     });
     effect(() => {
       const ex = this.exercise();
@@ -305,23 +309,33 @@ export class ExerciseEditorComponent {
   }
 
   protected async openMenu(): Promise<void> {
-    const ex = this.exercise();
-    const sheet = await this.sheets.create({
-      header: ex.exerciseName ?? `Ejercicio #${ex.exerciseId}`,
-      buttons: [
-        { text: 'Opciones de repeticiones', handler: () => { this.openRepsOptions(); } },
-        {
-          text: this.showRpe() ? 'Ocultar RPE' : 'Mostrar RPE',
-          handler: () => { this.toggleRpe(); },
-        },
-        { text: 'Reordenar ejercicios',   handler: () => { this.openReorder(); } },
-        { text: 'Reemplazar ejercicio',   handler: () => { this.actions.notImplemented('Reemplazar'); } },
-        { text: 'Agregar a superserie',   handler: () => { this.actions.notImplemented('Superserie'); } },
-        { text: 'Eliminar ejercicio', role: 'destructive', handler: () => { this.confirmDelete(); } },
-        { text: 'Cancelar', role: 'cancel' },
+    const picked = await this.selectSheet.open(this.vcr, {
+      header: 'Opciones del ejercicio',
+      subtitle: this.exerciseName(),
+      value: '',
+      options: [
+        { label: 'Opciones de repeticiones', value: 'reps',
+          leadingIcon: 'repeat-outline' },
+        { label: this.showRpe() ? 'Ocultar RPE' : 'Mostrar RPE',
+          value: 'rpe', leadingIcon: 'speedometer-outline' },
+        { label: 'Reordenar ejercicios',     value: 'reorder',
+          leadingIcon: 'reorder-three-outline' },
+        { label: 'Reemplazar ejercicio',     value: 'replace',
+          leadingIcon: 'swap-horizontal-outline' },
+        { label: 'Agregar a superserie',     value: 'superset',
+          leadingIcon: 'link-outline' },
+        { label: 'Eliminar ejercicio',       value: 'delete',
+          leadingIcon: 'trash-outline', destructive: true },
       ],
     });
-    await sheet.present();
+    switch (picked) {
+      case 'reps':     this.openRepsOptions(); break;
+      case 'rpe':      this.toggleRpe(); break;
+      case 'reorder':  this.openReorder(); break;
+      case 'replace':  this.actions.notImplemented('Reemplazar'); break;
+      case 'superset': this.actions.notImplemented('Superserie'); break;
+      case 'delete':   this.confirmDelete(); break;
+    }
   }
 
   protected async openRepsOptions(): Promise<void> {
