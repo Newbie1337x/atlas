@@ -111,7 +111,7 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
         <ion-input
           type="text"
           inputmode="decimal"
-          (ionFocus)="clearOnFocus('kg', $event)"
+          (ionFocus)="clearOnFocus($event)"
           [placeholder]="placeholderFor('kg', isBricks() ? 'ladr' : 'kg')"
           [attr.aria-label]="isBricks() ? 'Cantidad de ladrillos' : 'Peso en kg'"
           [ngModel]="displayedWeight()"
@@ -126,7 +126,7 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
             <ion-input
               type="text"
               inputmode="numeric"
-              (ionFocus)="clearOnFocus('repsMin', $event)"
+              (ionFocus)="clearOnFocus($event)"
               [placeholder]="placeholderFor('repsMin', 'min')"
               aria-label="Repeticiones mínimas"
               [ngModel]="set().targetRepsMin"
@@ -135,7 +135,7 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
             <ion-input
               type="text"
               inputmode="numeric"
-              (ionFocus)="clearOnFocus('repsMax', $event)"
+              (ionFocus)="clearOnFocus($event)"
               [placeholder]="placeholderFor('repsMax', 'max')"
               aria-label="Repeticiones máximas"
               [ngModel]="set().targetRepsMax"
@@ -145,7 +145,7 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
           <ion-input
             type="text"
             inputmode="numeric"
-            (ionFocus)="clearOnFocus('reps', $event)"
+            (ionFocus)="clearOnFocus($event)"
             [placeholder]="placeholderFor('reps', 'reps')"
             aria-label="Repeticiones"
             [ngModel]="set().targetRepsMin"
@@ -157,7 +157,7 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
         <ion-input
           type="text"
           inputmode="decimal"
-          (ionFocus)="clearOnFocus('rpe', $event)"
+          (ionFocus)="clearOnFocus($event)"
           [placeholder]="placeholderFor('rpe', 'RPE')"
           aria-label="RPE"
           [ngModel]="set().targetRpe"
@@ -332,7 +332,7 @@ export class SetEditorComponent {
    * popup (Traducir/Cortar/Copiar/Pegar) never appears — works
    * identically in Capacitor.
    */
-  protected clearOnFocus(_name: string, ev: Event): void {
+  protected clearOnFocus(ev: Event): void {
     const el = ev.target as HTMLIonInputElement | null;
     void el?.getInputElement().then(native => {
       if (!native) return;
