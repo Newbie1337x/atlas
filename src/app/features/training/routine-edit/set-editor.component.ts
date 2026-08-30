@@ -1,16 +1,29 @@
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy, Component, ViewContainerRef,
+  computed, inject, input, output,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
-  IonInput, IonSelect, IonSelectOption, IonButton, IonIcon,
+  IonInput, IonButton, IonIcon,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { closeCircle } from 'ionicons/icons';
-import { ExerciseCapabilities, RepsMode, RoutineSet } from '@core/training/routine.model';
+import { ExerciseCapabilities, RepsMode, RoutineSet, SetType } from '@core/training/routine.model';
 import { InputMode } from '@core/training/exercise.model';
+import { SelectSheetService, SelectSheetOption } from '../shared/select-sheet.service';
 
 /** Wildly permissive default when the parent has not yet resolved the
  *  exercise's capabilities from the backend (older routines missing the
  *  computed field). Prefer showing every input over silently hiding one. */
+/** Glyph shown in the row for special set types; WORKING falls through
+ *  to the numeric ordinal computed by the parent. */
+const GLYPH_BY_TYPE: Partial<Record<SetType, string>> = {
+  WARMUP: 'W', DROP_SET: 'D', FAILURE: 'F',
+};
+const CLASS_BY_TYPE: Partial<Record<SetType, string>> = {
+  WARMUP: 'warmup', DROP_SET: 'drop', FAILURE: 'failure',
+};
+
 const PERMISSIVE_CAPS: ExerciseCapabilities = {
   weight: true, reps: true, duration: false, distance: false,
   rpe: true, bricks: false,
@@ -42,7 +55,7 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
-    IonInput, IonSelect, IonSelectOption, IonButton, IonIcon,
+    IonInput, IonButton, IonIcon,
   ],
   styles: [`
     .row {
@@ -57,11 +70,16 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
       text-align: center;
     }
     .serie {
-      text-align: center;
-      font-size: 0.9em;
-      color: var(--ion-color-medium, #888);
-      --min-height: 32px;
+      --padding-start: 0; --padding-end: 0;
+      --padding-top: 0; --padding-bottom: 0;
+      min-height: 32px;
+      font-size: 0.95em;
+      font-weight: 600;
+      margin: 0;
     }
+    .serie.warmup  { color: var(--ion-color-warning, #f0ad4e); }
+    .serie.drop    { color: var(--ion-color-primary, #3880ff); }
+    .serie.failure { color: var(--ion-color-danger,  #eb445a); }
     .reps-range {
       display: flex;
       align-items: center;
@@ -77,21 +95,16 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
     <div class="row" [style.grid-template-columns]="gridTemplate()">
       <!-- Serie: dropdown filtered to allowed set types (WORKING option
            shows the row number). -->
-      <!-- selectedText is bound explicitly because ion-select caches the
-           projected option text; when a sibling's setType change shifts
-           this row's WORKING label from "3" to "2" the option is
-           recomputed but the header stays stale until re-picked. -->
-      <ion-select
-        class="serie"
-        interface="popover"
-        [ngModel]="set().setType"
-        [selectedText]="selectedTypeLabel()"
-        (ngModelChange)="patch({ setType: $event })"
+      <!-- Set-type opens the same SelectSheet used for reps and weight
+           mode. Included "Eliminar" as a destructive row so the whole
+           set-management sits in one place — matches Hevy's picker. -->
+      <ion-button
+        [class]="'serie ' + selectedSerieClass()"
+        fill="clear"
+        (click)="openTypeSheet()"
         aria-label="Tipo de serie">
-        @for (opt of typeOptions(); track opt.value) {
-          <ion-select-option [value]="opt.value">{{ opt.label }}</ion-select-option>
-        }
-      </ion-select>
+        {{ selectedTypeGlyph() }}
+      </ion-button>
 
       <!-- Kg / Ladrillos — hidden entirely when the exercise doesn't support
            weight. Mode toggle lives in the parent's header row, not here;
@@ -168,6 +181,9 @@ export class SetEditorComponent {
   readonly patchSet = output<Partial<RoutineSet>>();
   readonly remove = output<void>();
 
+  private readonly sheets = inject(SelectSheetService);
+  private readonly vcr = inject(ViewContainerRef);
+
   protected readonly isBricks = computed(() => this.inputMode() === 'BRICKS');
 
   /** What the input shows: kg raw, or kg÷brickWeight for bricks mode. */
@@ -182,25 +198,38 @@ export class SetEditorComponent {
   /** Resolved caps — never null in the template; falls back permissively. */
   protected readonly caps = computed(() => this.capabilities() ?? PERMISSIVE_CAPS);
 
-  /** Text shown in the collapsed ion-select — derives from the same
-   *  option list so a re-numbering after a sibling change repaints
-   *  without waiting for the user to reopen the picker. */
-  protected readonly selectedTypeLabel = computed(() =>
-    this.typeOptions().find(o => o.value === this.set().setType)?.label ?? '');
+  /** Glyph shown in the row's "Serie" cell: the ordinal for WORKING,
+   *  or W/D/F for the special types. Recomputes when a sibling change
+   *  shifts our number. */
+  protected readonly selectedTypeGlyph = computed(() =>
+    GLYPH_BY_TYPE[this.set().setType] ?? `${this.workingOrdinal() || this.index() + 1}`);
 
-  /** Set-type options the backend guard will actually accept for this
-   *  exercise. WORKING uses the ordinal-among-workings so warmups don't
-   *  push the working numbers up ([W W 1 2 3], not [W W 3 4 5]). Falls
-   *  back to array index+1 if the parent didn't pass an ordinal. */
-  protected readonly typeOptions = computed(() => {
-    const allowed = new Set(this.caps().allowedSetTypes);
+  /** Class hook so the glyph picks the same color as the sheet's chip
+   *  (warmup=amber, drop=blue, failure=red). */
+  protected readonly selectedSerieClass = computed(() =>
+    CLASS_BY_TYPE[this.set().setType] ?? '');
+
+  /** Set-type sheet options — includes an "Eliminar serie" row so the
+   *  whole set-management sits in the same overlay (Hevy pattern). */
+  protected readonly typeSheetOptions = computed<SelectSheetOption[]>(() => {
+    const allowed = new Set<SetType>(this.caps().allowedSetTypes);
     const workingLabel = `${this.workingOrdinal() || this.index() + 1}`;
-    return [
-      { value: 'WORKING', label: workingLabel },
-      { value: 'WARMUP',  label: 'W' },
-      { value: 'DROP_SET', label: 'D' },
-      { value: 'FAILURE',  label: 'F' },
-    ].filter(o => allowed.has(o.value as never));
+    const options: SelectSheetOption[] = [
+      { value: 'WARMUP',   label: 'Serie de Calentamiento',
+        leading: 'W', leadingColor: 'var(--ion-color-warning, #f0ad4e)' },
+      { value: 'WORKING',  label: 'Serie Normal',
+        leading: workingLabel },
+      { value: 'FAILURE',  label: 'Serie al Fallo',
+        leading: 'F', leadingColor: 'var(--ion-color-danger, #eb445a)' },
+      { value: 'DROP_SET', label: 'Serie Drop',
+        leading: 'D', leadingColor: 'var(--ion-color-primary, #3880ff)' },
+    ].filter(o => allowed.has(o.value as SetType));
+    options.push({
+      value: 'remove', label: 'Eliminar serie',
+      leading: '×', leadingColor: 'var(--ion-color-danger, #eb445a)',
+      destructive: true,
+    });
+    return options;
   });
 
   /** Column layout: Serie | [Kg] | [Reps] | [RPE] | (×). Any of the
@@ -235,6 +264,19 @@ export class SetEditorComponent {
 
   protected patch(p: Partial<RoutineSet>): void {
     this.patchSet.emit(p);
+  }
+
+  /** Opens the shared bottom sheet — same look as reps + weight-mode.
+   *  "remove" is handled inline; every other value is a SetType. */
+  protected async openTypeSheet(): Promise<void> {
+    const picked = await this.sheets.open(this.vcr, {
+      header: 'Seleccionar Tipo de Serie',
+      value: this.set().setType,
+      options: this.typeSheetOptions(),
+    });
+    if (picked === null) return;
+    if (picked === 'remove') { this.remove.emit(); return; }
+    this.patch({ setType: picked as SetType });
   }
 
   /** Coerce IonInput's string / null to a number or null. Empty → null. */

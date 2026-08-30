@@ -11,6 +11,14 @@ import { checkmark } from 'ionicons/icons';
 export interface SelectSheetOption {
   label: string;
   value: string;
+  /** Short glyph (letter/number/emoji) rendered as a colored chip
+   *  before the label — mirrors Hevy's set-type picker. Optional. */
+  leading?: string;
+  /** CSS color for the leading chip. Defaults to text color. */
+  leadingColor?: string;
+  /** Renders the row in a destructive color (red). Use for actions
+   *  like "Eliminar" that don't just pick a value. */
+  destructive?: boolean;
 }
 
 interface SelectSheetConfig {
@@ -103,6 +111,16 @@ export class SelectSheetService {
     }
     .opt:last-child { border-bottom: 0; }
     .opt:active { background: var(--ion-color-step-100, rgba(255, 255, 255, 0.06)); }
+    .opt.destructive { color: var(--ion-color-danger, #eb445a); }
+    .opt-leading {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px; height: 24px;
+      margin-right: 12px;
+      font-weight: 700;
+      font-size: 0.95em;
+    }
     .opt-label { flex: 1; }
     .opt-check { color: var(--ion-color-primary, #3880ff); font-size: 1.2em; }
     @keyframes slide-up {
@@ -115,7 +133,15 @@ export class SelectSheetService {
       <div class="grabber"></div>
       <div class="sheet-header">{{ header }}</div>
       @for (opt of options; track opt.value) {
-        <div class="opt" (click)="picked.emit(opt.value)">
+        <div
+          class="opt"
+          [class.destructive]="opt.destructive"
+          (click)="picked.emit(opt.value)">
+          @if (opt.leading) {
+            <span class="opt-leading" [style.color]="opt.leadingColor || null">
+              {{ opt.leading }}
+            </span>
+          }
           <span class="opt-label">{{ opt.label }}</span>
           @if (opt.value === value) {
             <ion-icon class="opt-check" name="checkmark" aria-hidden="true" />
