@@ -1,4 +1,7 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy, Component, ViewContainerRef,
+  computed, effect, inject, input, signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
   IonCard, IonCardHeader, IonCardTitle, IonCardContent,
@@ -13,6 +16,7 @@ import { RoutineEditFormService } from './routine-edit-form.service';
 import { RepsMode, SetEditorComponent } from './set-editor.component';
 import { ExerciseIconComponent } from '../shared/exercise-icon.component';
 import { RestPickerComponent } from '../shared/rest-picker.component';
+import { SelectSheetService } from '../shared/select-sheet.service';
 import { ReorderExercisesModalComponent } from './reorder-exercises-modal.component';
 
 /**
@@ -124,6 +128,8 @@ export class ExerciseEditorComponent {
   private readonly alerts = inject(AlertController);
   private readonly modal = inject(ModalController);
   private readonly actions = inject(TrainingActionsService);
+  private readonly selectSheet = inject(SelectSheetService);
+  private readonly vcr = inject(ViewContainerRef);
 
   /**
    * Per-exercise view preferences. Inferred from the initial data
@@ -224,22 +230,15 @@ export class ExerciseEditorComponent {
   }
 
   private async openRepsOptions(): Promise<void> {
-    const current = this.repsMode();
-    const sheet = await this.sheets.create({
+    const picked = await this.selectSheet.open(this.vcr, {
       header: 'Opciones de repeticiones',
-      buttons: [
-        {
-          text: 'Repeticiones' + (current === 'single' ? ' ✓' : ''),
-          handler: () => { this.setRepsMode('single'); },
-        },
-        {
-          text: 'Rango de repeticiones' + (current === 'range' ? ' ✓' : ''),
-          handler: () => { this.setRepsMode('range'); },
-        },
-        { text: 'Cancelar', role: 'cancel' },
+      value: this.repsMode(),
+      options: [
+        { label: 'Repeticiones',          value: 'single' },
+        { label: 'Rango de repeticiones', value: 'range' },
       ],
     });
-    await sheet.present();
+    if (picked === 'single' || picked === 'range') this.setRepsMode(picked);
   }
 
   /**
