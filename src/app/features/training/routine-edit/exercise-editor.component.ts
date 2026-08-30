@@ -103,6 +103,7 @@ import { ReorderExercisesModalComponent } from './reorder-exercises-modal.compon
       <ion-card-content>
         <training-rest-picker
           [value]="exercise().restSeconds"
+          [subtitle]="exercise().exerciseName ?? ''"
           (valueChange)="form.updateExerciseRest(index(), $event)" />
 
         <ion-input
@@ -138,6 +139,7 @@ import { ReorderExercisesModalComponent } from './reorder-exercises-modal.compon
             [set]="s"
             [index]="$index"
             [workingOrdinal]="workingOrdinals()[$index]"
+            [exerciseName]="exercise().exerciseName ?? ''"
             [repsMode]="repsMode()"
             [showRpe]="showRpe()"
             [capabilities]="caps()"
@@ -309,6 +311,7 @@ export class ExerciseEditorComponent {
   protected async openRepsOptions(): Promise<void> {
     const picked = await this.selectSheet.open(this.vcr, {
       header: 'Opciones de repeticiones',
+      subtitle: this.exercise().exerciseName ?? '',
       value: this.repsMode(),
       options: [
         { label: 'Repeticiones',          value: 'SINGLE' },
@@ -323,7 +326,8 @@ export class ExerciseEditorComponent {
    *  workout runner. */
   protected openWeightModeSheet(): Promise<void> {
     return this.weightPicker.open(
-      this.vcr, this.exercise().exerciseId, this.inputMode(), this.brickWeight());
+      this.vcr, this.exercise().exerciseId, this.inputMode(), this.brickWeight(),
+      this.exercise().exerciseName ?? '');
   }
 
   /**

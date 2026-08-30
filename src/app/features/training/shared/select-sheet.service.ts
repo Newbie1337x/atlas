@@ -26,6 +26,9 @@ interface SelectSheetConfig {
   options: SelectSheetOption[];
   /** Value marked with a ✓ when the sheet renders. Pass '' for no default. */
   value: string;
+  /** Small grey line under the header — usually the exercise name so
+   *  the merchant knows which item they're editing. Optional. */
+  subtitle?: string;
 }
 
 /**
@@ -55,6 +58,7 @@ export class SelectSheetService {
     });
     const ref = overlayRef.attach(new ComponentPortal(SelectSheetComponent, vcr));
     ref.setInput('header', config.header);
+    ref.setInput('subtitle', config.subtitle ?? '');
     ref.setInput('options', config.options);
     ref.setInput('value', config.value);
 
@@ -96,10 +100,15 @@ export class SelectSheetService {
     }
     .sheet-header {
       padding: 12px 16px;
-      font-size: 1rem;
-      font-weight: 600;
       text-align: center;
       border-bottom: 1px solid var(--ion-color-step-150, rgba(255, 255, 255, 0.08));
+    }
+    .sheet-title { font-size: 1rem; font-weight: 600; }
+    .sheet-subtitle {
+      display: block;
+      margin-top: 2px;
+      font-size: 0.8em;
+      color: var(--ion-color-medium, #888);
     }
     .opt {
       display: flex;
@@ -131,7 +140,12 @@ export class SelectSheetService {
   template: `
     <div class="sheet" role="dialog" [attr.aria-label]="header">
       <div class="grabber"></div>
-      <div class="sheet-header">{{ header }}</div>
+      <div class="sheet-header">
+        <span class="sheet-title">{{ header }}</span>
+        @if (subtitle) {
+          <span class="sheet-subtitle">{{ subtitle }}</span>
+        }
+      </div>
       @for (opt of options; track opt.value) {
         <div
           class="opt"
@@ -155,6 +169,7 @@ export class SelectSheetComponent {
   @Input({ required: true }) header!: string;
   @Input({ required: true }) options!: SelectSheetOption[];
   @Input({ required: true }) value!: string;
+  @Input() subtitle = '';
   @Output() readonly picked = new EventEmitter<string>();
 
   constructor() {

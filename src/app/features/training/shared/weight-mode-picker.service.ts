@@ -42,12 +42,14 @@ export class WeightModePickerService {
     exerciseId: number,
     currentMode: InputMode,
     currentWeight: number,
+    exerciseName = '',
   ): Promise<void> {
     const bricksLabel = currentMode === 'BRICKS'
       ? `Ladrillos (${currentWeight} kg — cambiar peso)`
       : `Ladrillos (${currentWeight} kg c/u)`;
     const picked = await this.sheets.open(vcr, {
       header: 'Contar el peso como',
+      subtitle: exerciseName,
       value: currentMode,
       options: [
         { label: 'Kilos', value: 'KG' },

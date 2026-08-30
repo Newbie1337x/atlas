@@ -176,6 +176,9 @@ export class SetEditorComponent {
    *  exercise-editor so the header + every set stay in sync. */
   readonly inputMode = input<InputMode>('KG');
   readonly brickWeightKg = input<number>(5);
+  /** Shown as a grey subtitle on the set-type sheet so the merchant
+   *  sees which exercise this row belongs to. */
+  readonly exerciseName = input<string>('');
   readonly patchSet = output<Partial<RoutineSet>>();
   readonly remove = output<void>();
 
@@ -269,6 +272,7 @@ export class SetEditorComponent {
   protected async openTypeSheet(): Promise<void> {
     const picked = await this.sheets.open(this.vcr, {
       header: 'Seleccionar Tipo de Serie',
+      subtitle: this.exerciseName(),
       value: this.set().setType,
       options: this.typeSheetOptions(),
     });

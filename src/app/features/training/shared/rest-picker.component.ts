@@ -51,14 +51,22 @@ import { REST_OPTIONS, formatRestSeconds } from './rest-values';
       cursor: pointer;
     }
     .sheet-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      position: relative;
       padding: 12px 16px;
+      text-align: center;
       border-bottom: 1px solid var(--ion-color-step-150, rgba(255, 255, 255, 0.08));
     }
-    .sheet-title { font-size: 1rem; font-weight: 600; }
+    .sheet-title { display: block; font-size: 1rem; font-weight: 600; }
+    .sheet-subtitle {
+      display: block;
+      margin-top: 2px;
+      font-size: 0.8em;
+      color: var(--ion-color-medium, #888);
+    }
     .listo-btn {
+      position: absolute;
+      top: 50%; right: 12px;
+      transform: translateY(-50%);
       background: none; border: 0; padding: 4px 8px;
       font-size: 1rem; font-weight: 600;
       color: var(--ion-color-primary, #3880ff);
@@ -132,6 +140,9 @@ import { REST_OPTIONS, formatRestSeconds } from './rest-values';
         <div class="grabber" (click)="cancel()"></div>
         <div class="sheet-header">
           <span class="sheet-title">Descanso</span>
+          @if (subtitle()) {
+            <span class="sheet-subtitle">{{ subtitle() }}</span>
+          }
           <button type="button" class="listo-btn" (click)="commit()">Listo</button>
         </div>
         <div class="wheel-shell">
@@ -152,6 +163,9 @@ import { REST_OPTIONS, formatRestSeconds } from './rest-values';
 })
 export class RestPickerComponent {
   readonly value = input<number | null>(null);
+  /** Rendered as a grey line under the "Descanso" title — usually the
+   *  exercise name so the merchant sees which item they're editing. */
+  readonly subtitle = input<string>('');
   readonly valueChange = output<number | null>();
 
   private readonly overlay = inject(Overlay);
