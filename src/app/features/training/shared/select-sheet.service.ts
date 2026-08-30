@@ -57,14 +57,8 @@ export class SelectSheetService {
       hasBackdrop: true,
       backdropClass: 'cdk-overlay-dark-backdrop',
       scrollStrategy: this.overlay.scrollStrategies.block(),
-      // Position the wrapper 100px BELOW the viewport bottom so the
-      // sheet bleeds past Chrome Android's dynamic URL bar / gesture
-      // area — otherwise a white strip peeks through under the sheet
-      // when the layout viewport is shorter than the visual viewport.
-      // The sheet's own padding-bottom compensates so content stays
-      // visually inside the safe area.
       positionStrategy: this.overlay.position()
-          .global().bottom('-100px').centerHorizontally(),
+          .global().bottom('0').centerHorizontally(),
     });
     const ref = overlayRef.attach(new ComponentPortal(SelectSheetComponent, vcr));
     ref.setInput('header', config.header);
@@ -100,12 +94,10 @@ export class SelectSheetService {
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      /* The CDK positionStrategy sits the wrapper 100px below the
-         viewport so the sheet's dark background always covers any
-         URL-bar / gesture gap Chrome Android leaves under the sheet.
-         Compensate with extra bottom padding so the last option
-         still ends inside the safe area. */
-      padding-bottom: calc(max(env(safe-area-inset-bottom), 20px) + 100px);
+      /* Safe-area for iOS notch / gesture bar. The white-seam issue in
+         routine-edit is parked for later — likely tied to the shell's
+         bottom nav stacking context, not this padding. */
+      padding-bottom: max(env(safe-area-inset-bottom), 20px);
     }
     .grabber {
       align-self: center;
