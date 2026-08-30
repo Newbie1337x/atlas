@@ -68,37 +68,17 @@ export class SelectSheetService {
     ref.setInput('value', config.value);
 
     return new Promise((resolve) => {
-      // Consume the system back gesture: push a history entry so the
-      // next back pop closes the sheet instead of navigating the page.
-      // historyOwned flips false when we cede the entry (either the
-      // user popped it via back, or we pop it ourselves on close).
-      let historyOwned = true;
-      history.pushState({ sheet: 'select' }, '');
-      const popHandler = () => {
-        historyOwned = false;
-        done(null);
-      };
-      window.addEventListener('popstate', popHandler);
-
       let closing = false;
       const done = async (v: string | null) => {
         if (closing) return;   // guard against double-fire (backdrop + drag race)
         closing = true;
-        window.removeEventListener('popstate', popHandler);
         // Detach the CDK backdrop AND kill the overlay pane's pointer
         // events immediately — otherwise the still-present pane
         // (.cdk-overlay-pane has pointer-events: auto by default)
         // eats the tap that opens the next sheet during the 220ms
-        // close animation (the "second tap needed" bug).
+        // close animation.
         overlayRef.detachBackdrop();
         overlayRef.overlayElement.style.pointerEvents = 'none';
-        // Pop our history entry synchronously BEFORE the close animation
-        // starts. Otherwise history.back() lands 220ms later and its
-        // popstate can dismiss a sheet the user opened in the meantime.
-        if (historyOwned) {
-          historyOwned = false;
-          history.back();
-        }
         await ref.instance.animateClose();
         overlayRef.dispose();
         resolve(v);
@@ -106,6 +86,11 @@ export class SelectSheetService {
       ref.instance.picked.subscribe(v => done(v));
       ref.instance.dismissed.subscribe(() => done(null));
       overlayRef.backdropClick().subscribe(() => done(null));
+      // NB: back-gesture-closes-sheet (history.pushState + popstate)
+      // was pulled out because history.back()'s async popstate raced
+      // with the next sheet's open — first tap on ⋮ appeared to do
+      // nothing. Drag-to-close, backdrop tap, and option tap cover
+      // 90% of the intent; system back navigates away as usual.
     });
   }
 }
