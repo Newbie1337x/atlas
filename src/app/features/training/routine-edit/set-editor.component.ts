@@ -110,7 +110,7 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
         <ion-input
           type="text"
           inputmode="decimal"
-          (ionFocus)="selectAll($event)"
+          (ionFocus)="clearOnFocus($event)"
           [placeholder]="isBricks() ? 'ladr' : 'kg'"
           [attr.aria-label]="isBricks() ? 'Cantidad de ladrillos' : 'Peso en kg'"
           [ngModel]="displayedWeight()"
@@ -125,7 +125,7 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
             <ion-input
               type="text"
               inputmode="numeric"
-              (ionFocus)="selectAll($event)"
+              (ionFocus)="clearOnFocus($event)"
               placeholder="min"
               aria-label="Repeticiones mínimas"
               [ngModel]="set().targetRepsMin"
@@ -134,7 +134,7 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
             <ion-input
               type="text"
               inputmode="numeric"
-              (ionFocus)="selectAll($event)"
+              (ionFocus)="clearOnFocus($event)"
               placeholder="max"
               aria-label="Repeticiones máximas"
               [ngModel]="set().targetRepsMax"
@@ -144,7 +144,7 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
           <ion-input
             type="text"
             inputmode="numeric"
-            (ionFocus)="selectAll($event)"
+            (ionFocus)="clearOnFocus($event)"
             placeholder="reps"
             aria-label="Repeticiones"
             [ngModel]="set().targetRepsMin"
@@ -156,7 +156,7 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
         <ion-input
           type="text"
           inputmode="decimal"
-          (ionFocus)="selectAll($event)"
+          (ionFocus)="clearOnFocus($event)"
           placeholder="RPE"
           aria-label="RPE"
           [ngModel]="set().targetRpe"
@@ -280,16 +280,38 @@ export class SetEditorComponent {
   }
 
   /**
-   * On focus, select the whole value so the next keystroke replaces it
-   * instead of appending. Mirrors how Hevy/Strong handle numeric cells
-   * — one tap → one keystroke → new value, no backspace dance. Reads
-   * the underlying <input> off ion-input's shadow DOM (its promise
-   * resolves immediately after focus).
+   * On focus, clear the DOM value (without firing an input event, so
+   * the model keeps the old number). The next keystroke fills a blank
+   * field — same UX as select-all-on-focus but WITHOUT a real
+   * selection, so Chrome Android's ActionMode popup (Traducir/Cortar/
+   * Copiar/Pegar) never appears. Works identically in Capacitor.
+   *
+   * If the user blurs without typing anything, the previous value is
+   * restored so a "tap to inspect" doesn't wipe the set. We detect
+   * "didn't type" with a one-shot input listener and clean both
+   * listeners on blur so there's no leak.
    */
-  protected async selectAll(ev: Event): Promise<void> {
-    const input = ev.target as HTMLIonInputElement | null;
-    const native = await input?.getInputElement();
-    native?.select();
+  protected async clearOnFocus(ev: Event): Promise<void> {
+    const el = ev.target as HTMLIonInputElement | null;
+    const native = await el?.getInputElement();
+    if (!native) return;
+    const prev = native.value;
+    native.value = '';
+    let touched = false;
+    const onInput = () => { touched = true; };
+    const onBlur = () => {
+      native.removeEventListener('input', onInput);
+      native.removeEventListener('blur', onBlur);
+      if (!touched && native.value === '') {
+        native.value = prev;
+        // Fire an input event so ngModel + our patchSet flow re-sync
+        // in the (harmless) case where anything upstream changed while
+        // the field was blank.
+        native.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    };
+    native.addEventListener('input', onInput);
+    native.addEventListener('blur', onBlur);
   }
 
   /** Coerce IonInput's string / null to a number or null. Empty → null. */
