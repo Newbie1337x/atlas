@@ -85,14 +85,16 @@ export class SelectSheetService {
         if (closing) return;   // guard against double-fire (backdrop + drag race)
         closing = true;
         window.removeEventListener('popstate', popHandler);
-        // Play the close animation before disposing so the sheet
-        // slides down instead of vanishing.
-        await ref.instance.animateClose();
-        overlayRef.dispose();
+        // Pop our history entry synchronously BEFORE the close animation
+        // starts. Otherwise history.back() lands 220ms later and its
+        // popstate can dismiss a sheet the user opened in the meantime
+        // (the "second tap needed" bug after a drag-close).
         if (historyOwned) {
           historyOwned = false;
           history.back();
         }
+        await ref.instance.animateClose();
+        overlayRef.dispose();
         resolve(v);
       };
       ref.instance.picked.subscribe(v => done(v));
@@ -129,19 +131,20 @@ export class SelectSheetService {
          bottom nav stacking context, not this padding. */
       padding-bottom: max(env(safe-area-inset-bottom), 20px);
     }
-    .grabber-hit {
-      align-self: center;
-      /* Fat hit target — the visual bar is 36×4 but the drag surface
-         is 60×20 so the user doesn't need to be pixel-perfect. */
-      padding: 8px 12px;
-      margin-top: 4px;
+    /* Drag surface — the entire header area (grabber + title + subtitle,
+       ending at the first divider). Gives a fat, natural target for
+       the swipe-down-to-close gesture. touch-action: none prevents
+       Chrome Android from stealing the drag for pull-to-refresh. */
+    .drag-zone {
       touch-action: none;
       cursor: grab;
     }
-    .grabber-hit:active { cursor: grabbing; }
+    .drag-zone:active { cursor: grabbing; }
     .grabber {
       display: block;
+      align-self: center;
       width: 36px; height: 4px;
+      margin: 8px auto 4px;
       background: var(--ion-color-step-300, rgba(255, 255, 255, 0.25));
       border-radius: 2px;
     }
@@ -186,14 +189,15 @@ export class SelectSheetService {
   `],
   template: `
     <div #sheetEl class="sheet" role="dialog" [attr.aria-label]="header">
-      <div class="grabber-hit" (pointerdown)="onGrabberDown($event)">
+      <!-- Everything above the first divider is one big drag surface. -->
+      <div class="drag-zone" (pointerdown)="onGrabberDown($event)">
         <span class="grabber" aria-hidden="true"></span>
-      </div>
-      <div class="sheet-header">
-        <span class="sheet-title">{{ header }}</span>
-        @if (subtitle) {
-          <span class="sheet-subtitle">{{ subtitle }}</span>
-        }
+        <div class="sheet-header">
+          <span class="sheet-title">{{ header }}</span>
+          @if (subtitle) {
+            <span class="sheet-subtitle">{{ subtitle }}</span>
+          }
+        </div>
       </div>
       @for (opt of options; track opt.value) {
         <div
