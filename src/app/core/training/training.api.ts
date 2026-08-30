@@ -1,6 +1,6 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, catchError, of, throwError } from 'rxjs';
 import { API_BASE_URL } from '@core/auth/auth.tokens';
 import { OffsetPage } from '@core/pagination.model';
 import {
@@ -89,16 +89,18 @@ export class TrainingApi {
   // --- Per-exercise input preference (KG vs BRICKS + brick weight) ---
   // globalProfileId is inferred from the JWT server-side.
 
-  /** null = the user never chose (client should default to KG on machines). */
+  /** 404 = the user never chose (caller maps to null → default KG). */
   getInputPreference(exerciseId: number): Observable<ExerciseInputPreference | null> {
-    return this.http.get<ExerciseInputPreference | null>(
-      `${this.baseUrl}/api/training/exercises/${exerciseId}/input-preference`);
+    return this.http.get<ExerciseInputPreference>(
+      `${this.baseUrl}/api/training/exercises/${exerciseId}/input-preference/me`)
+      .pipe(catchError((err: HttpErrorResponse) =>
+        err.status === 404 ? of(null) : throwError(() => err)));
   }
 
   putInputPreference(
     exerciseId: number, body: InputPreferenceRequest,
   ): Observable<ExerciseInputPreference> {
     return this.http.put<ExerciseInputPreference>(
-      `${this.baseUrl}/api/training/exercises/${exerciseId}/input-preference`, body);
+      `${this.baseUrl}/api/training/exercises/${exerciseId}/input-preference/me`, body);
   }
 }

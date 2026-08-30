@@ -10,8 +10,13 @@ import {
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { addOutline, caretDown, ellipsisVertical } from 'ionicons/icons';
+import { firstValueFrom } from 'rxjs';
+import { injectQuery, injectQueryClient } from '@tanstack/angular-query-experimental';
 import { RoutineExercise } from '@core/training/routine.model';
+import { InputMode } from '@core/training/exercise.model';
 import { TrainingActionsService } from '@core/training/training-actions.service';
+import { TrainingApi } from '@core/training/training.api';
+import { trainingKeys } from '@core/training/training.keys';
 import { RoutineEditFormService } from './routine-edit-form.service';
 import { SetEditorComponent } from './set-editor.component';
 import { ExerciseCapabilities, RepsMode } from '@core/training/routine.model';
@@ -67,7 +72,7 @@ import { ReorderExercisesModalComponent } from './reorder-exercises-modal.compon
       text-transform: uppercase;
       text-align: center;
     }
-    .reps-header {
+    .reps-header, .weight-header {
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -75,7 +80,7 @@ import { ReorderExercisesModalComponent } from './reorder-exercises-modal.compon
       cursor: pointer;
       color: var(--ion-color-primary, #3880ff);
     }
-    .reps-header ion-icon { font-size: 0.85em; }
+    .reps-header ion-icon, .weight-header ion-icon { font-size: 0.85em; }
   `],
   template: `
     <ion-card>
@@ -114,7 +119,16 @@ import { ReorderExercisesModalComponent } from './reorder-exercises-modal.compon
 
         <div class="header-legend" [style.grid-template-columns]="gridTemplate()">
           <span>Serie</span>
-          @if (caps().weight) { <span>Kg</span> }
+          @if (caps().weight) {
+            @if (caps().bricks) {
+              <span class="weight-header" (click)="openWeightModeSheet()">
+                {{ weightHeaderLabel() }}
+                <ion-icon name="caret-down" aria-hidden="true" />
+              </span>
+            } @else {
+              <span>Kg</span>
+            }
+          }
           @if (caps().reps) {
             <span class="reps-header" (click)="openRepsOptions()">
               {{ repsMode() === 'RANGE' ? 'Rango de reps' : 'Reps' }}
@@ -129,10 +143,11 @@ import { ReorderExercisesModalComponent } from './reorder-exercises-modal.compon
           <training-set-editor
             [set]="s"
             [index]="$index"
-            [exerciseId]="exercise().exerciseId"
             [repsMode]="repsMode()"
             [showRpe]="showRpe()"
             [capabilities]="caps()"
+            [inputMode]="inputMode()"
+            [brickWeightKg]="brickWeight()"
             (patchSet)="form.updateSet(index(), $index, $event)"
             (remove)="form.removeSet(index(), $index)" />
         }
@@ -156,6 +171,31 @@ export class ExerciseEditorComponent {
   private readonly actions = inject(TrainingActionsService);
   private readonly selectSheet = inject(SelectSheetService);
   private readonly vcr = inject(ViewContainerRef);
+  private readonly api = inject(TrainingApi);
+  private readonly queryClient = injectQueryClient();
+
+  /**
+   * Per-user KG/BRICKS preference for this exercise. Fetched only on
+   * exercises that actually support bricks (MACHINE/CABLE/SMITH). 404 →
+   * null (user never set anything → default KG mode). Passed down to
+   * every set-editor so the row inputs and column header stay in sync.
+   */
+  protected readonly prefQuery = injectQuery(() => ({
+    queryKey: trainingKeys.inputPreference(this.exercise().exerciseId),
+    queryFn: () => firstValueFrom(
+      this.api.getInputPreference(this.exercise().exerciseId)),
+    enabled: this.caps().bricks,
+    staleTime: 5 * 60_000,
+  }));
+
+  protected readonly inputMode = computed<InputMode>(
+    () => this.prefQuery.data()?.inputMode ?? 'KG');
+  protected readonly brickWeight = computed<number>(
+    () => Number(this.prefQuery.data()?.brickWeightKg ?? 5));
+  protected readonly weightHeaderLabel = computed(() =>
+    this.inputMode() === 'BRICKS'
+      ? `Ladrillos (${this.brickWeight()}kg)`
+      : 'Kg');
 
   /** Reps mode lives on the domain (persisted per exercise); reading it
    *  as a computed keeps the template reactive to draft mutations. */
@@ -266,6 +306,71 @@ export class ExerciseEditorComponent {
       ],
     });
     if (picked === 'SINGLE' || picked === 'RANGE') this.setRepsMode(picked);
+  }
+
+  /**
+   * Weight-mode sheet (KG vs BRICKS). Shows a third row "Cambiar peso del
+   * ladrillo…" only when bricks is already active. Persists via the
+   * per-user endpoint and invalidates its query key so every set-editor
+   * re-reads the fresh value.
+   */
+  protected async openWeightModeSheet(): Promise<void> {
+    const currentMode = this.inputMode();
+    const currentWeight = this.brickWeight();
+    const options = [
+      { label: 'Kilos', value: 'KG' },
+      { label: `Ladrillos (${currentWeight} kg c/u)`, value: 'BRICKS' },
+    ];
+    if (currentMode === 'BRICKS') {
+      options.push({ label: 'Cambiar peso del ladrillo…', value: 'edit-weight' });
+    }
+    const picked = await this.selectSheet.open(this.vcr, {
+      header: 'Contar el peso como',
+      value: currentMode,
+      options,
+    });
+    if (picked === null) return;
+    if (picked === 'edit-weight') { await this.promptBrickWeight(currentWeight); return; }
+    if (picked === currentMode) return;
+    if (picked === 'BRICKS') {
+      // First switch → ask for the brick weight so we don't silently
+      // stick the user with the DB default they never saw.
+      await this.saveInputPreference('BRICKS', currentWeight);
+      await this.promptBrickWeight(currentWeight);
+    } else {
+      await this.saveInputPreference(picked as InputMode, currentWeight);
+    }
+  }
+
+  private async promptBrickWeight(current: number): Promise<void> {
+    const alert = await this.alerts.create({
+      header: 'Peso del ladrillo',
+      inputs: [{
+        name: 'kg', type: 'number', min: 0.25,
+        attributes: { step: '0.25' },
+        value: current, placeholder: 'kg',
+      }],
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        { text: 'Guardar', role: 'confirm' },
+      ],
+    });
+    await alert.present();
+    const { role, data } = await alert.onDidDismiss<{ values: { kg: string } }>();
+    if (role !== 'confirm') return;
+    const kg = Number(data?.values?.kg);
+    if (!Number.isFinite(kg) || kg <= 0) return;
+    await this.saveInputPreference('BRICKS', kg);
+  }
+
+  private async saveInputPreference(inputMode: InputMode, brickWeightKg: number): Promise<void> {
+    const exerciseId = this.exercise().exerciseId;
+    await firstValueFrom(this.api.putInputPreference(exerciseId, {
+      inputMode, brickWeightKg,
+    }));
+    await this.queryClient.invalidateQueries({
+      queryKey: trainingKeys.inputPreference(exerciseId),
+    });
   }
 
   /**
