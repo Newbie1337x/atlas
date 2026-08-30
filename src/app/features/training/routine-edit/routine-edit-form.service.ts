@@ -46,6 +46,14 @@ export class RoutineEditFormService {
     return id ? this._originalById().get(id) : undefined;
   }
 
+  /** Clears the dirty flag without touching the draft. Used after a
+   *  successful save so the CanDeactivate guard doesn't prompt when
+   *  we navigate away — the refetch that reseeds the snapshot may
+   *  land after the navigation. */
+  markPristine(): void {
+    this._dirty.set(false);
+  }
+
   loadFrom(source: RoutineDetail): void {
     // Deep copy so upstream cache (TanStack Query) stays immutable.
     this._draft.set(structuredClone(source));

@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { routineEditDeactivateGuard } from './routine-edit/routine-edit-deactivate.guard';
 
 /**
  * Training tab — routines list + active workout tracker + community
@@ -16,5 +17,9 @@ export const trainingRoutes: Routes = [
   { path: 'explore',           loadComponent: () => import('./explore.page').then((m) => m.ExplorePage) },
   { path: 'session',           loadComponent: () => import('./session.page').then((m) => m.SessionPage) },
   { path: 'routines/:id',      loadComponent: () => import('./routine-detail.page').then((m) => m.RoutineDetailPage) },
-  { path: 'routines/:id/edit', loadComponent: () => import('./routine-edit.page').then((m) => m.RoutineEditPage) },
+  {
+    path: 'routines/:id/edit',
+    loadComponent: () => import('./routine-edit.page').then((m) => m.RoutineEditPage),
+    canDeactivate: [routineEditDeactivateGuard],
+  },
 ];

@@ -142,24 +142,31 @@ export class RoutineEditPage {
   }
 
   /**
-   * Back handler. When the draft is dirty, prompt "descartar cambios?"
-   * before leaving — matches Hevy's pattern. Clean draft just leaves.
-   * Navigates to the routine detail page (same target the old
-   * ion-back-button had via defaultHref).
+   * Shared confirm used by (a) the custom back button in the toolbar
+   * and (b) the CanDeactivate guard that fires on system back / swipe.
+   * Returns true when the caller may proceed with the exit (clean
+   * draft or user picked "Descartar cambios"), false when they picked
+   * Cancelar. Public because the guard reads it off the component.
    */
+  async confirmDiscardIfDirty(): Promise<boolean> {
+    if (!this.form.dirty()) return true;
+    const alert = await this.alerts.create({
+      header: '¿Estás seguro de que quieres descartar todos los cambios de la rutina?',
+      buttons: [
+        { text: 'Descartar cambios', role: 'destructive' },
+        { text: 'Cancelar',          role: 'cancel'      },
+      ],
+    });
+    await alert.present();
+    const { role } = await alert.onDidDismiss();
+    return role === 'destructive';
+  }
+
+  /** Toolbar back button. Router.navigate re-fires the guard, so if the
+   *  user confirmed the discard here we skip the guard's re-prompt by
+   *  the fact that guard's alert is the same code path. Small
+   *  double-check race is fine — worst case one extra tap on Cancelar. */
   protected async cancel(): Promise<void> {
-    if (this.form.dirty()) {
-      const alert = await this.alerts.create({
-        header: '¿Estás seguro de que quieres descartar todos los cambios de la rutina?',
-        buttons: [
-          { text: 'Descartar cambios', role: 'destructive' },
-          { text: 'Cancelar', role: 'cancel' },
-        ],
-      });
-      await alert.present();
-      const { role } = await alert.onDidDismiss();
-      if (role !== 'destructive') return;
-    }
     this.router.navigate(['/training/routines', this.routineId()]);
   }
 
@@ -170,6 +177,9 @@ export class RoutineEditPage {
     try {
       await firstValueFrom(this.api.updateRoutine(draft.id, toUpdateRequest(draft)));
       await this.queryClient.invalidateQueries({ queryKey: trainingKeys.all });
+      // Clear dirty before navigating so the deactivate guard doesn't
+      // prompt "descartar cambios?" over a just-saved routine.
+      this.form.markPristine();
       this.router.navigate(['/training/routines', draft.id]);
     } finally {
       this.saving.set(false);
