@@ -1,12 +1,17 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
 import {
-  IonItem, IonLabel, IonNote, IonButton, IonIcon, ActionSheetController,
-} from '@ionic/angular';
+  ChangeDetectionStrategy, Component, ViewContainerRef,
+  computed, inject, input,
+} from '@angular/core';
+import { Router, RouterLink } from '@angular/router';
+import { IonItem, IonLabel, IonNote, IonButton, IonIcon } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { ellipsisVertical } from 'ionicons/icons';
+import {
+  ellipsisVertical, shareSocialOutline, copyOutline,
+  createOutline, trashOutline,
+} from 'ionicons/icons';
 import { RoutineSummary } from '@core/training/routine.model';
 import { TrainingActionsService } from '@core/training/training-actions.service';
+import { SelectSheetService } from '@shared/ui/select-sheet.service';
 
 /**
  * One routine row in the training list. Tap the row → opens detail;
@@ -59,11 +64,18 @@ export class RoutineCardComponent {
   readonly routine = input.required<RoutineSummary>();
 
   private readonly actions = inject(TrainingActionsService);
-  private readonly sheets = inject(ActionSheetController);
+  private readonly sheets = inject(SelectSheetService);
   private readonly router = inject(Router);
+  private readonly vcr = inject(ViewContainerRef);
 
   constructor() {
-    addIcons({ 'ellipsis-vertical': ellipsisVertical });
+    addIcons({
+      'ellipsis-vertical': ellipsisVertical,
+      'share-social-outline': shareSocialOutline,
+      'copy-outline': copyOutline,
+      'create-outline': createOutline,
+      'trash-outline': trashOutline,
+    });
   }
 
   protected readonly previewText = computed(() => {
@@ -75,16 +87,26 @@ export class RoutineCardComponent {
 
   protected async openMenu(): Promise<void> {
     const r = this.routine();
-    const sheet = await this.sheets.create({
-      header: r.title,
-      buttons: [
-        { text: 'Compartir rutina', handler: () => { this.actions.notImplemented('Compartir'); } },
-        { text: 'Duplicar rutina',  handler: () => { this.actions.confirmCloneRoutine(r); } },
-        { text: 'Editar rutina',    handler: () => { this.router.navigate(['/training/routines', r.id, 'edit']); } },
-        { text: 'Borrar rutina', role: 'destructive', handler: () => { this.actions.confirmDeleteRoutine(r); } },
-        { text: 'Cancelar', role: 'cancel' },
+    const picked = await this.sheets.open(this.vcr, {
+      header: 'Opciones de la rutina',
+      subtitle: r.title,
+      value: '',
+      options: [
+        { label: 'Compartir rutina', value: 'share',
+          leadingIcon: 'share-social-outline' },
+        { label: 'Duplicar rutina',  value: 'duplicate',
+          leadingIcon: 'copy-outline' },
+        { label: 'Editar rutina',    value: 'edit',
+          leadingIcon: 'create-outline' },
+        { label: 'Borrar rutina',    value: 'delete',
+          leadingIcon: 'trash-outline', destructive: true },
       ],
     });
-    await sheet.present();
+    switch (picked) {
+      case 'share':     this.actions.notImplemented('Compartir'); break;
+      case 'duplicate': this.actions.confirmCloneRoutine(r); break;
+      case 'edit':      this.router.navigate(['/training/routines', r.id, 'edit']); break;
+      case 'delete':    this.actions.confirmDeleteRoutine(r); break;
+    }
   }
 }

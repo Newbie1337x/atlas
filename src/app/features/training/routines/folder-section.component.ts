@@ -1,12 +1,19 @@
-import { ChangeDetectionStrategy, Component, inject, input, signal } from '@angular/core';
 import {
-  IonList, IonListHeader, IonLabel, IonNote, IonIcon, IonButton, ActionSheetController,
+  ChangeDetectionStrategy, Component, ViewContainerRef,
+  inject, input, signal,
+} from '@angular/core';
+import {
+  IonList, IonListHeader, IonLabel, IonNote, IonIcon, IonButton,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { chevronDown, chevronForward, ellipsisVertical } from 'ionicons/icons';
+import {
+  chevronDown, chevronForward, ellipsisVertical,
+  pencilOutline, addCircleOutline, trashOutline,
+} from 'ionicons/icons';
 import { RoutineFolder } from '@core/training/folder.model';
 import { RoutineSummary } from '@core/training/routine.model';
 import { TrainingActionsService } from '@core/training/training-actions.service';
+import { SelectSheetService } from '@shared/ui/select-sheet.service';
 import { RoutineCardComponent } from './routine-card.component';
 
 /**
@@ -100,7 +107,8 @@ export class FolderSectionComponent {
   readonly folder = input<RoutineFolder | null>(null);
 
   private readonly actions = inject(TrainingActionsService);
-  private readonly sheets = inject(ActionSheetController);
+  private readonly sheets = inject(SelectSheetService);
+  private readonly vcr = inject(ViewContainerRef);
 
   protected readonly collapsed = signal(false);
 
@@ -109,6 +117,9 @@ export class FolderSectionComponent {
       'chevron-down': chevronDown,
       'chevron-forward': chevronForward,
       'ellipsis-vertical': ellipsisVertical,
+      'pencil-outline': pencilOutline,
+      'add-circle-outline': addCircleOutline,
+      'trash-outline': trashOutline,
     });
   }
 
@@ -117,15 +128,23 @@ export class FolderSectionComponent {
   }
 
   protected async openMenu(folder: RoutineFolder): Promise<void> {
-    const sheet = await this.sheets.create({
-      header: folder.name,
-      buttons: [
-        { text: 'Renombrar', handler: () => { this.actions.promptRenameFolder(folder); } },
-        { text: 'Nueva rutina en esta carpeta', handler: () => { this.actions.promptCreateRoutine(folder.id); } },
-        { text: 'Borrar carpeta', role: 'destructive', handler: () => { this.actions.confirmDeleteFolder(folder); } },
-        { text: 'Cancelar', role: 'cancel' },
+    const picked = await this.sheets.open(this.vcr, {
+      header: 'Opciones de la carpeta',
+      subtitle: folder.name,
+      value: '',
+      options: [
+        { label: 'Renombrar',                     value: 'rename',
+          leadingIcon: 'pencil-outline' },
+        { label: 'Nueva rutina en esta carpeta',  value: 'new',
+          leadingIcon: 'add-circle-outline' },
+        { label: 'Borrar carpeta',                value: 'delete',
+          leadingIcon: 'trash-outline', destructive: true },
       ],
     });
-    await sheet.present();
+    switch (picked) {
+      case 'rename': this.actions.promptRenameFolder(folder); break;
+      case 'new':    this.actions.promptCreateRoutine(folder.id); break;
+      case 'delete': this.actions.confirmDeleteFolder(folder); break;
+    }
   }
 }

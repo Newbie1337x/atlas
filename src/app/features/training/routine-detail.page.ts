@@ -1,18 +1,24 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import {
+  ChangeDetectionStrategy, Component, ViewContainerRef,
+  computed, inject,
+} from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import {
   IonContent, IonHeader, IonTitle, IonToolbar,
   IonButtons, IonBackButton, IonButton, IonIcon,
-  IonNote, IonSpinner, ActionSheetController,
+  IonNote, IonSpinner,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { ellipsisVertical } from 'ionicons/icons';
+import {
+  ellipsisVertical, createOutline, pencilOutline, copyOutline, trashOutline,
+} from 'ionicons/icons';
 import { TrainingApi } from '@core/training/training.api';
 import { TrainingActionsService } from '@core/training/training-actions.service';
 import { trainingKeys } from '@core/training/training.keys';
 import { RoutineDetail } from '@core/training/routine.model';
+import { SelectSheetService } from '@shared/ui/select-sheet.service';
 import { RoutineExerciseListComponent } from './routine-detail/routine-exercise-list.component';
 
 /**
@@ -84,7 +90,8 @@ export class RoutineDetailPage {
   private readonly router = inject(Router);
   private readonly api = inject(TrainingApi);
   private readonly actions = inject(TrainingActionsService);
-  private readonly sheets = inject(ActionSheetController);
+  private readonly sheets = inject(SelectSheetService);
+  private readonly vcr = inject(ViewContainerRef);
 
   protected readonly routineId = computed(() => {
     const raw = this.route.snapshot.paramMap.get('id');
@@ -98,28 +105,39 @@ export class RoutineDetailPage {
   }));
 
   constructor() {
-    addIcons({ 'ellipsis-vertical': ellipsisVertical });
+    addIcons({
+      'ellipsis-vertical': ellipsisVertical,
+      'create-outline': createOutline,
+      'pencil-outline': pencilOutline,
+      'copy-outline': copyOutline,
+      'trash-outline': trashOutline,
+    });
   }
 
   protected async openMenu(routine: RoutineDetail): Promise<void> {
-    const sheet = await this.sheets.create({
-      header: routine.title,
-      buttons: [
-        { text: 'Editar ejercicios', handler: () => { this.router.navigate(['/training/routines', routine.id, 'edit']); } },
-        { text: 'Renombrar', handler: () => { this.actions.promptRenameRoutine(routine); } },
-        { text: 'Duplicar',  handler: () => { this.actions.confirmCloneRoutine(routine); } },
-        {
-          text: 'Borrar rutina',
-          role: 'destructive',
-          handler: () => {
-            this.actions.confirmDeleteRoutine(routine).then(() => {
-              this.router.navigate(['/training']);
-            });
-          },
-        },
-        { text: 'Cancelar', role: 'cancel' },
+    const picked = await this.sheets.open(this.vcr, {
+      header: 'Opciones de la rutina',
+      subtitle: routine.title,
+      value: '',
+      options: [
+        { label: 'Editar ejercicios', value: 'edit',
+          leadingIcon: 'create-outline' },
+        { label: 'Renombrar',         value: 'rename',
+          leadingIcon: 'pencil-outline' },
+        { label: 'Duplicar',          value: 'duplicate',
+          leadingIcon: 'copy-outline' },
+        { label: 'Borrar rutina',     value: 'delete',
+          leadingIcon: 'trash-outline', destructive: true },
       ],
     });
-    await sheet.present();
+    switch (picked) {
+      case 'edit':      this.router.navigate(['/training/routines', routine.id, 'edit']); break;
+      case 'rename':    this.actions.promptRenameRoutine(routine); break;
+      case 'duplicate': this.actions.confirmCloneRoutine(routine); break;
+      case 'delete':
+        this.actions.confirmDeleteRoutine(routine).then(() =>
+          this.router.navigate(['/training']));
+        break;
+    }
   }
 }
