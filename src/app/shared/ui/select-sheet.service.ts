@@ -1,6 +1,6 @@
 import {
-  ChangeDetectionStrategy, Component, EventEmitter, Injectable, Input,
-  Output, ViewContainerRef, inject,
+  ChangeDetectionStrategy, Component, ElementRef, EventEmitter, Injectable,
+  Input, Output, ViewChild, ViewContainerRef, inject,
 } from '@angular/core';
 import { Overlay, OverlayModule } from '@angular/cdk/overlay';
 import { ComponentPortal } from '@angular/cdk/portal';
@@ -80,8 +80,14 @@ export class SelectSheetService {
       };
       window.addEventListener('popstate', popHandler);
 
-      const done = (v: string | null) => {
+      let closing = false;
+      const done = async (v: string | null) => {
+        if (closing) return;   // guard against double-fire (backdrop + drag race)
+        closing = true;
         window.removeEventListener('popstate', popHandler);
+        // Play the close animation before disposing so the sheet
+        // slides down instead of vanishing.
+        await ref.instance.animateClose();
         overlayRef.dispose();
         if (historyOwned) {
           historyOwned = false;
@@ -90,6 +96,7 @@ export class SelectSheetService {
         resolve(v);
       };
       ref.instance.picked.subscribe(v => done(v));
+      ref.instance.dismissed.subscribe(() => done(null));
       overlayRef.backdropClick().subscribe(() => done(null));
     });
   }
@@ -108,7 +115,12 @@ export class SelectSheetService {
       border-radius: 16px 16px 0 0;
       width: min(100vw, 480px);
       box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
-      animation: slide-up 220ms cubic-bezier(0.32, 0.72, 0, 1);
+      animation: slide-up 260ms cubic-bezier(0.32, 0.72, 0, 1);
+      /* Set by the component when dismissing (backdrop / pick / back
+         gesture) OR when a drag past threshold releases — same
+         translateY(100%) target, same cubic curve, matched duration. */
+      transition: transform 220ms cubic-bezier(0.32, 0.72, 0, 1);
+      will-change: transform;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -117,12 +129,21 @@ export class SelectSheetService {
          bottom nav stacking context, not this padding. */
       padding-bottom: max(env(safe-area-inset-bottom), 20px);
     }
-    .grabber {
+    .grabber-hit {
       align-self: center;
+      /* Fat hit target — the visual bar is 36×4 but the drag surface
+         is 60×20 so the user doesn't need to be pixel-perfect. */
+      padding: 8px 12px;
+      margin-top: 4px;
+      touch-action: none;
+      cursor: grab;
+    }
+    .grabber-hit:active { cursor: grabbing; }
+    .grabber {
+      display: block;
       width: 36px; height: 4px;
       background: var(--ion-color-step-300, rgba(255, 255, 255, 0.25));
       border-radius: 2px;
-      margin: 8px 0 4px;
     }
     .sheet-header {
       padding: 18px 20px 16px;
@@ -164,8 +185,10 @@ export class SelectSheetService {
     }
   `],
   template: `
-    <div class="sheet" role="dialog" [attr.aria-label]="header">
-      <div class="grabber"></div>
+    <div #sheetEl class="sheet" role="dialog" [attr.aria-label]="header">
+      <div class="grabber-hit" (pointerdown)="onGrabberDown($event)">
+        <span class="grabber" aria-hidden="true"></span>
+      </div>
       <div class="sheet-header">
         <span class="sheet-title">{{ header }}</span>
         @if (subtitle) {
@@ -203,6 +226,78 @@ export class SelectSheetComponent {
   @Input({ required: true }) value!: string;
   @Input() subtitle = '';
   @Output() readonly picked = new EventEmitter<string>();
+  /** Emitted when the user drags the sheet past the dismiss threshold.
+   *  Service treats it the same as a backdrop click (returns null). */
+  @Output() readonly dismissed = new EventEmitter<void>();
+
+  @ViewChild('sheetEl', { static: true }) private sheetEl!: ElementRef<HTMLElement>;
+
+  /** ~30% down = dismiss. Below that spring back. */
+  private static readonly DISMISS_PX = 120;
+  private dragStartY = 0;
+  private dragging = false;
+
+  /**
+   * Play the slide-down animation (transform → translateY(100%)) and
+   * resolve when the transition ends. Service awaits this before
+   * disposing the overlay so close feels as smooth as open.
+   */
+  animateClose(): Promise<void> {
+    const el = this.sheetEl.nativeElement;
+    // Kill the open animation so our transition can take over.
+    el.style.animation = 'none';
+    return new Promise(resolve => {
+      const done = () => {
+        el.removeEventListener('transitionend', done);
+        resolve();
+      };
+      el.addEventListener('transitionend', done);
+      // requestAnimationFrame so the browser has committed the current
+      // frame before we mutate the transform — otherwise the transition
+      // may be skipped when we set it in the same tick as animation:none.
+      requestAnimationFrame(() => {
+        el.style.transform = 'translateY(100%)';
+      });
+      // Safety net if transitionend never fires (browser edge cases).
+      setTimeout(done, 400);
+    });
+  }
+
+  protected onGrabberDown(ev: PointerEvent): void {
+    this.dragStartY = ev.clientY;
+    this.dragging = true;
+    const el = this.sheetEl.nativeElement;
+    // Disable both transition + animation while the finger is down so
+    // the sheet follows 1:1 with the pointer.
+    el.style.animation = 'none';
+    el.style.transition = 'none';
+    window.addEventListener('pointermove', this.onMove, { passive: true });
+    window.addEventListener('pointerup',   this.onUp,   { once: true });
+    window.addEventListener('pointercancel', this.onUp, { once: true });
+  }
+
+  private readonly onMove = (ev: PointerEvent) => {
+    if (!this.dragging) return;
+    const dy = Math.max(0, ev.clientY - this.dragStartY);
+    this.sheetEl.nativeElement.style.transform = `translateY(${dy}px)`;
+  };
+
+  private readonly onUp = (ev: PointerEvent) => {
+    this.dragging = false;
+    window.removeEventListener('pointermove', this.onMove);
+    const el = this.sheetEl.nativeElement;
+    // Restore transition so either the spring-back or the dismissal
+    // slide animates smoothly from the current dragged position.
+    el.style.transition = '';
+    const dy = Math.max(0, ev.clientY - this.dragStartY);
+    if (dy > SelectSheetComponent.DISMISS_PX) {
+      // Past threshold → continue as a close (service handles it).
+      this.dismissed.emit();
+    } else {
+      // Spring back to rest.
+      el.style.transform = 'translateY(0)';
+    }
+  };
 
   constructor() {
     addIcons({ checkmark });
