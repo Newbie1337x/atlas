@@ -5,11 +5,7 @@ import {
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { closeCircle } from 'ionicons/icons';
-import { RoutineSet } from '@core/training/routine.model';
-
-/** How reps are edited for this row. Chosen at the exercise level and
- *  passed down — single = one number, range = min-max. */
-export type RepsMode = 'single' | 'range';
+import { RepsMode, RoutineSet } from '@core/training/routine.model';
 
 /**
  * One set row. Column order matches Hevy: Serie | Kg | Reps | [RPE] | (×).
@@ -92,7 +88,7 @@ export type RepsMode = 'single' | 'range';
         (ngModelChange)="patch({ targetWeightKg: numeric($event) })" />
 
       <!-- Reps: 1 or 2 inputs sharing a single grid cell. -->
-      @if (repsMode() === 'range') {
+      @if (repsMode() === 'RANGE') {
         <div class="reps-range">
           <ion-input
             type="number"
@@ -136,7 +132,7 @@ export type RepsMode = 'single' | 'range';
 export class SetEditorComponent {
   readonly set = input.required<RoutineSet>();
   readonly index = input.required<number>();
-  readonly repsMode = input<RepsMode>('range');
+  readonly repsMode = input<RepsMode>('SINGLE');
   readonly showRpe = input<boolean>(false);
   readonly patchSet = output<Partial<RoutineSet>>();
   readonly remove = output<void>();
@@ -146,7 +142,7 @@ export class SetEditorComponent {
   protected readonly gridTemplate = computed(() => {
     const serie = '48px';
     const kg = '1fr';
-    const reps = this.repsMode() === 'range' ? '1.4fr' : '1fr';
+    const reps = this.repsMode() === 'RANGE' ? '1.4fr' : '1fr';
     const rpe = this.showRpe() ? '60px' : '';
     const remove = '32px';
     return [serie, kg, reps, rpe, remove].filter(Boolean).join(' ');

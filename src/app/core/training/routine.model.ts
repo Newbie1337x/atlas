@@ -16,6 +16,9 @@ export type RoutineOwnerType = 'MEMBER' | 'TEMPLATE' | 'COACH';
 /** Mirrors backend SetType enum. */
 export type SetType = 'WARMUP' | 'WORKING' | 'DROP' | 'FAILURE';
 
+/** How reps are edited for the exercise. Persisted per exercise; default SINGLE. */
+export type RepsMode = 'SINGLE' | 'RANGE';
+
 export interface ExercisePreview {
   exerciseId: number;
   name: string | null;
@@ -64,6 +67,7 @@ export interface RoutineExercise {
   restSeconds: number | null;
   supersetGroupId: string | null;
   notes: string | null;
+  repsMode: RepsMode;
   sets: RoutineSet[];
 }
 
@@ -111,6 +115,7 @@ export interface UpdateRoutineRequest {
     restSeconds?: number | null;
     supersetGroupId?: string | null;
     notes?: string | null;
+    repsMode?: RepsMode;
     sets: Array<{
       orderIndex: number;
       setType: SetType;

@@ -210,6 +210,7 @@ export function toUpdateRequest(
       restSeconds: ex.restSeconds,
       supersetGroupId: ex.supersetGroupId,
       notes: ex.notes,
+      repsMode: ex.repsMode,
       sets: ex.sets.map(s => ({
         orderIndex: s.orderIndex,
         setType: s.setType,

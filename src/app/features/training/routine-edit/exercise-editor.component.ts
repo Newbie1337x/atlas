@@ -13,7 +13,8 @@ import { addOutline, caretDown, ellipsisVertical } from 'ionicons/icons';
 import { RoutineExercise } from '@core/training/routine.model';
 import { TrainingActionsService } from '@core/training/training-actions.service';
 import { RoutineEditFormService } from './routine-edit-form.service';
-import { RepsMode, SetEditorComponent } from './set-editor.component';
+import { SetEditorComponent } from './set-editor.component';
+import { RepsMode } from '@core/training/routine.model';
 import { ExerciseIconComponent } from '../shared/exercise-icon.component';
 import { RestPickerComponent } from '../shared/rest-picker.component';
 import { SelectSheetService } from '../shared/select-sheet.service';
@@ -107,7 +108,7 @@ import { ReorderExercisesModalComponent } from './reorder-exercises-modal.compon
           <span>Serie</span>
           <span>Kg</span>
           <span class="reps-header" (click)="openRepsOptions()">
-            {{ repsMode() === 'range' ? 'Rango de reps' : 'Reps' }}
+            {{ repsMode() === 'RANGE' ? 'Rango de reps' : 'Reps' }}
             <ion-icon name="caret-down" aria-hidden="true" />
           </span>
           @if (showRpe()) { <span>RPE</span> }
@@ -144,14 +145,13 @@ export class ExerciseEditorComponent {
   private readonly selectSheet = inject(SelectSheetService);
   private readonly vcr = inject(ViewContainerRef);
 
-  /**
-   * Per-exercise view preferences. Inferred from the initial data
-   * (sets with min === max → single; any set with a non-null RPE →
-   * showRpe on) and then mutable via the ⋮ menu. Not persisted
-   * server-side; when the editor is reopened the same inference runs
-   * again on whatever the routine now contains.
-   */
-  protected readonly repsMode = signal<RepsMode>('range');
+  /** Reps mode lives on the domain (persisted per exercise); reading it
+   *  as a computed keeps the template reactive to draft mutations. */
+  protected readonly repsMode = computed<RepsMode>(() => this.exercise().repsMode);
+
+  /** Show-RPE stays a local UI-only signal — no domain field. Seeded
+   *  from data once so exercises that already carry an RPE reveal the
+   *  column; from there the user's toggle wins for the session. */
   protected readonly showRpe = signal<boolean>(false);
 
   /** Grid template mirrors the set-editor row so the legend + data
@@ -159,30 +159,23 @@ export class ExerciseEditorComponent {
   protected readonly gridTemplate = computed(() => {
     const serie = '48px';
     const kg = '1fr';
-    const reps = this.repsMode() === 'range' ? '1.4fr' : '1fr';
+    const reps = this.repsMode() === 'RANGE' ? '1.4fr' : '1fr';
     const rpe = this.showRpe() ? '60px' : '';
     const remove = '32px';
     return [serie, kg, reps, rpe, remove].filter(Boolean).join(' ');
   });
 
-  /** Guards the inference below — once the user opens the menu and
-   *  toggles anything, their choice wins even if the raw data would
-   *  suggest otherwise. */
-  private inferred = false;
+  /** Guards the show-RPE inference so a set edit does not fight the
+   *  user's manual choice. */
+  private rpeInferred = false;
 
   constructor() {
     addIcons({ 'add-outline': addOutline, 'caret-down': caretDown, 'ellipsis-vertical': ellipsisVertical });
-    // Seed the view preferences from the initial data ONCE. Later set
-    // edits (e.g. mirror-write in single mode) must not flip the mode
-    // back and forth.
     effect(() => {
       const ex = this.exercise();
-      if (this.inferred) return;
-      const inferredMode: RepsMode = ex.sets.every(s => s.targetRepsMin === s.targetRepsMax)
-        ? 'single' : 'range';
-      this.repsMode.set(inferredMode);
+      if (this.rpeInferred) return;
       this.showRpe.set(ex.sets.some(s => s.targetRpe != null));
-      this.inferred = true;
+      this.rpeInferred = true;
     }, { allowSignalWrites: true });
   }
 
@@ -248,29 +241,22 @@ export class ExerciseEditorComponent {
       header: 'Opciones de repeticiones',
       value: this.repsMode(),
       options: [
-        { label: 'Repeticiones',          value: 'single' },
-        { label: 'Rango de repeticiones', value: 'range' },
+        { label: 'Repeticiones',          value: 'SINGLE' },
+        { label: 'Rango de repeticiones', value: 'RANGE' },
       ],
     });
-    if (picked === 'single' || picked === 'range') this.setRepsMode(picked);
+    if (picked === 'SINGLE' || picked === 'RANGE') this.setRepsMode(picked);
   }
 
   /**
-   * Mode is a pure UI preference — it changes which inputs are visible,
-   * never the underlying data. If the row already has min !== max
-   * (range values) and the user picks single, the max survives on the
-   * record; only when the user actually types into the single input
-   * does the mirror-write in set-editor collapse min === max.
-   *
-   * Side effect: after switching to single without editing anything,
-   * saving preserves the range; on the next open we infer range again
-   * from the data. Honest to what the user typed originally. If they
-   * really wanted single, they retype the reps and the mirror-write
-   * kicks in.
+   * Persists the picked mode on the exercise's domain field (server
+   * round-trip on save). Does NOT touch the sets — max survives on the
+   * record when switching to single; only typing into the single input
+   * mirror-writes min===max via set-editor.
    */
   private setRepsMode(mode: RepsMode): void {
     if (this.repsMode() === mode) return;
-    this.repsMode.set(mode);
+    this.form.updateExerciseRepsMode(this.index(), mode);
   }
 
   private toggleRpe(): void {

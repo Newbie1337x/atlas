@@ -1,6 +1,6 @@
 import { Injectable, computed, signal } from '@angular/core';
 import {
-  RoutineDetail, RoutineExercise, RoutineSet, SetType,
+  RepsMode, RoutineDetail, RoutineExercise, RoutineSet, SetType,
 } from '@core/training/routine.model';
 
 /**
@@ -57,6 +57,7 @@ export class RoutineEditFormService {
             restSeconds: 90,
             supersetGroupId: null,
             notes: null,
+            repsMode: 'SINGLE',
             sets: [emptySet(0)],
           },
         ],
@@ -89,6 +90,10 @@ export class RoutineEditFormService {
 
   updateExerciseNotes(exerciseIndex: number, notes: string | null): void {
     this.updateExerciseAt(exerciseIndex, ex => ({ ...ex, notes: notes?.trim() || null }));
+  }
+
+  updateExerciseRepsMode(exerciseIndex: number, repsMode: RepsMode): void {
+    this.updateExerciseAt(exerciseIndex, ex => ({ ...ex, repsMode }));
   }
 
   // ---------- Sets ----------
