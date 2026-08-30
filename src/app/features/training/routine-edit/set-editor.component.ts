@@ -110,6 +110,7 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
         <ion-input
           type="text"
           inputmode="decimal"
+          (ionFocus)="selectAll($event)"
           [placeholder]="isBricks() ? 'ladr' : 'kg'"
           [attr.aria-label]="isBricks() ? 'Cantidad de ladrillos' : 'Peso en kg'"
           [ngModel]="displayedWeight()"
@@ -124,6 +125,7 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
             <ion-input
               type="text"
               inputmode="numeric"
+              (ionFocus)="selectAll($event)"
               placeholder="min"
               aria-label="Repeticiones mínimas"
               [ngModel]="set().targetRepsMin"
@@ -132,6 +134,7 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
             <ion-input
               type="text"
               inputmode="numeric"
+              (ionFocus)="selectAll($event)"
               placeholder="max"
               aria-label="Repeticiones máximas"
               [ngModel]="set().targetRepsMax"
@@ -141,6 +144,7 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
           <ion-input
             type="text"
             inputmode="numeric"
+            (ionFocus)="selectAll($event)"
             placeholder="reps"
             aria-label="Repeticiones"
             [ngModel]="set().targetRepsMin"
@@ -152,6 +156,7 @@ const PERMISSIVE_CAPS: ExerciseCapabilities = {
         <ion-input
           type="text"
           inputmode="decimal"
+          (ionFocus)="selectAll($event)"
           placeholder="RPE"
           aria-label="RPE"
           [ngModel]="set().targetRpe"
@@ -272,6 +277,19 @@ export class SetEditorComponent {
     if (picked === null) return;
     if (picked === 'remove') { this.remove.emit(); return; }
     this.patch({ setType: picked as SetType });
+  }
+
+  /**
+   * On focus, select the whole value so the next keystroke replaces it
+   * instead of appending. Mirrors how Hevy/Strong handle numeric cells
+   * — one tap → one keystroke → new value, no backspace dance. Reads
+   * the underlying <input> off ion-input's shadow DOM (its promise
+   * resolves immediately after focus).
+   */
+  protected async selectAll(ev: Event): Promise<void> {
+    const input = ev.target as HTMLIonInputElement | null;
+    const native = await input?.getInputElement();
+    native?.select();
   }
 
   /** Coerce IonInput's string / null to a number or null. Empty → null. */
