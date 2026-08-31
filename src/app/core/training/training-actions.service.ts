@@ -1,11 +1,12 @@
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { AlertController, ToastController } from '@ionic/angular';
+import { AlertController, ModalController, ToastController } from '@ionic/angular';
 import { injectQueryClient } from '@tanstack/angular-query-experimental';
 import { TrainingApi } from './training.api';
 import { trainingKeys } from './training.keys';
 import { RoutineFolder } from './folder.model';
 import { RoutineDetail, UpdateRoutineRequest } from './routine.model';
+import { ReorderModalComponent } from '@shared/ui/reorder-modal.component';
 
 /** Minimum shape for actions that only need identity — accepts summary or detail. */
 type RoutineRef = { id: number; title: string };
@@ -33,6 +34,7 @@ export class TrainingActionsService {
   private readonly queryClient = injectQueryClient();
   private readonly alerts = inject(AlertController);
   private readonly toasts = inject(ToastController);
+  private readonly modal = inject(ModalController);
 
   // ---------- Folders ----------
 
@@ -55,6 +57,46 @@ export class TrainingActionsService {
     if (!name || name === folder.name) return;
     await firstValueFrom(this.api.updateFolder(folder.id, { name }));
     await this.invalidate();
+  }
+
+  /**
+   * Opens the shared ReorderModal populated with the current folder
+   * list. Drag reorders the local `draft` array in-place; on close we
+   * PUT each folder whose position differs from its previous
+   * displayOrder. Batches happen in parallel and cache invalidates
+   * once at the end.
+   *
+   * Backend has no dedicated batch-reorder endpoint; we send N PUTs.
+   * With <20 folders in practice this is fine — moving one item
+   * usually only shifts a handful, and unmoved items are skipped.
+   */
+  async openReorderFolders(folders: readonly RoutineFolder[]): Promise<void> {
+    const draft: RoutineFolder[] = [...folders];
+    const m = await this.modal.create({
+      component: ReorderModalComponent,
+      componentProps: {
+        title: 'Reordenar carpetas',
+        items: () => draft,
+        labelFn: (f: RoutineFolder) => f.name,
+        onMove: (from: number, to: number) => {
+          const [item] = draft.splice(from, 1);
+          draft.splice(to, 0, item);
+        },
+      },
+    });
+    await m.present();
+    await m.onDidDismiss();
+    const puts: Promise<unknown>[] = [];
+    draft.forEach((folder, idx) => {
+      if (folder.displayOrder !== idx) {
+        puts.push(firstValueFrom(
+          this.api.updateFolder(folder.id, { displayOrder: idx })));
+      }
+    });
+    if (puts.length) {
+      await Promise.all(puts);
+      await this.invalidate();
+    }
   }
 
   async confirmDeleteFolder(folder: RoutineFolder): Promise<void> {

@@ -56,6 +56,13 @@ import { FolderSectionComponent } from './routines/folder-section.component';
       <ion-button fill="outline" expand="block" (click)="actions.promptCreateFolder()">
         Nueva carpeta
       </ion-button>
+      @if ((foldersQuery.data() ?? []).length > 1) {
+        <ion-button
+          fill="outline" expand="block"
+          (click)="actions.openReorderFolders(foldersQuery.data() ?? [])">
+          Reordenar carpetas
+        </ion-button>
+      }
       <ion-button fill="outline" expand="block" (click)="actions.promptCreateRoutine()">
         Nueva rutina
       </ion-button>
