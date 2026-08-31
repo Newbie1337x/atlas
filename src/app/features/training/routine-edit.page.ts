@@ -141,6 +141,12 @@ export class RoutineEditPage {
     if (data) this.form.addExercise(data.id, data.name, data.demoMediaUrl, data.capabilities);
   }
 
+  /** Reentrance guard — while the confirm dialog is already showing,
+   *  subsequent invocations (from rapid back-gesture pumps that
+   *  Angular Router queues as it restores the URL after each cancel)
+   *  return false immediately instead of stacking more alerts. */
+  private confirming = false;
+
   /**
    * Shared confirm used by (a) the custom back button in the toolbar
    * and (b) the CanDeactivate guard that fires on system back / swipe.
@@ -150,16 +156,22 @@ export class RoutineEditPage {
    */
   async confirmDiscardIfDirty(): Promise<boolean> {
     if (!this.form.dirty()) return true;
-    const alert = await this.alerts.create({
-      header: '¿Estás seguro de que quieres descartar todos los cambios de la rutina?',
-      buttons: [
-        { text: 'Descartar cambios', role: 'destructive' },
-        { text: 'Cancelar',          role: 'cancel'      },
-      ],
-    });
-    await alert.present();
-    const { role } = await alert.onDidDismiss();
-    return role === 'destructive';
+    if (this.confirming) return false;
+    this.confirming = true;
+    try {
+      const alert = await this.alerts.create({
+        header: '¿Estás seguro de que quieres descartar todos los cambios de la rutina?',
+        buttons: [
+          { text: 'Descartar cambios', role: 'destructive' },
+          { text: 'Cancelar',          role: 'cancel'      },
+        ],
+      });
+      await alert.present();
+      const { role } = await alert.onDidDismiss();
+      return role === 'destructive';
+    } finally {
+      this.confirming = false;
+    }
   }
 
   /** Toolbar back button. Router.navigate re-fires the guard, so if the
