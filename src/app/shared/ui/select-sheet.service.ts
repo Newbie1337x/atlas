@@ -69,22 +69,28 @@ export class SelectSheetService {
 
     return new Promise((resolve) => {
       let closing = false;
-      const done = async (v: string | null) => {
+      const done = async (v: string | null, viaDrag = false) => {
         if (closing) return;   // guard against double-fire (backdrop + drag race)
         closing = true;
-        // Detach the CDK backdrop AND kill the overlay pane's pointer
-        // events immediately — otherwise the still-present pane
-        // (.cdk-overlay-pane has pointer-events: auto by default)
-        // eats the tap that opens the next sheet during the 220ms
-        // close animation.
         overlayRef.detachBackdrop();
         overlayRef.overlayElement.style.pointerEvents = 'none';
+        // Drag-close already moved the sheet visually; skip the extra
+        // animation and dispose the overlay immediately so no CDK
+        // artefact hangs around eating the next tap.
+        if (viaDrag) {
+          overlayRef.dispose();
+          resolve(v);
+          return;
+        }
         await ref.instance.animateClose();
         overlayRef.dispose();
         resolve(v);
       };
       ref.instance.picked.subscribe(v => done(v));
-      ref.instance.dismissed.subscribe(() => done(null));
+      // Drag-dismiss animates via the drag itself; tell done() to skip
+      // the extra slide-down + await window so no CDK layer lingers
+      // eating the next tap on the row of ⋮ dots.
+      ref.instance.dismissed.subscribe(() => done(null, true));
       overlayRef.backdropClick().subscribe(() => done(null));
       // NB: back-gesture-closes-sheet (history.pushState + popstate)
       // was pulled out because history.back()'s async popstate raced
