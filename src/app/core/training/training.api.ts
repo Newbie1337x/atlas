@@ -75,6 +75,30 @@ export class TrainingApi {
     return this.http.put<RoutineDetail>(`${this.baseUrl}/api/training/routines/${id}`, body);
   }
 
+  /**
+   * Metadata-only PATCH — title / notes / folderId / displayOrder.
+   * Every field optional, null on server means "keep existing".
+   * Cheap for rename + move + individual reorder without carrying
+   * the whole exercise tree the full PUT requires.
+   */
+  patchRoutineMetadata(
+    id: number,
+    body: { title?: string; notes?: string | null; folderId?: number | null; displayOrder?: number },
+  ): Observable<RoutineDetail> {
+    return this.http.patch<RoutineDetail>(`${this.baseUrl}/api/training/routines/${id}`, body);
+  }
+
+  /**
+   * Batch reorder every routine in a folder in one transaction.
+   * folderId = null for the loose "Mis rutinas" bucket — encoded
+   * server-side as path `/folder/0/order`. The server sets each
+   * routine's displayOrder to its index in `routineIds`.
+   */
+  reorderRoutinesInFolder(folderId: number | null, routineIds: number[]): Observable<void> {
+    const path = `${this.baseUrl}/api/training/routines/folder/${folderId ?? 0}/order`;
+    return this.http.patch<void>(path, { routineIds });
+  }
+
   /** Server-side deep copy — used by "duplicar rutina". Returns the new routine. */
   cloneRoutine(id: number): Observable<RoutineDetail> {
     return this.http.post<RoutineDetail>(`${this.baseUrl}/api/training/routines/${id}/clone`, {});

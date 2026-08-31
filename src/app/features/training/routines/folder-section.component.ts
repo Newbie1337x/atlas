@@ -14,7 +14,7 @@ import {
 import { RoutineFolder } from '@core/training/folder.model';
 import { RoutineSummary } from '@core/training/routine.model';
 import { TrainingActionsService } from '@core/training/training-actions.service';
-import { SelectSheetService } from '@shared/ui/select-sheet.service';
+import { SelectSheetService, SelectSheetOption } from '@shared/ui/select-sheet.service';
 import { RoutineCardComponent } from './routine-card.component';
 
 /**
@@ -134,7 +134,10 @@ export class FolderSectionComponent {
   }
 
   protected async openMenu(folder: RoutineFolder): Promise<void> {
-    const options = [
+    // Options built as a typed array from the start — previous version
+    // had `as never` casts to shove destructive rows in, which silently
+    // broke re-render in some cases. Explicit type = predictable.
+    const options: SelectSheetOption[] = [
       { label: 'Renombrar',                     value: 'rename',
         leadingIcon: 'pencil-outline' },
       { label: 'Nueva rutina en esta carpeta',  value: 'new',
@@ -149,7 +152,7 @@ export class FolderSectionComponent {
         leadingIcon: 'swap-vertical-outline' });
     }
     options.push({ label: 'Borrar carpeta', value: 'delete',
-      leadingIcon: 'trash-outline', destructive: true } as never);
+      leadingIcon: 'trash-outline', destructive: true });
     const picked = await this.sheets.open(this.vcr, {
       header: 'Opciones de la carpeta',
       subtitle: folder.name,
@@ -159,7 +162,7 @@ export class FolderSectionComponent {
     switch (picked) {
       case 'rename':           this.actions.promptRenameFolder(folder); break;
       case 'new':              this.actions.promptCreateRoutine(folder.id); break;
-      case 'reorder-routines': this.actions.openReorderRoutines(this.routines()); break;
+      case 'reorder-routines': this.actions.openReorderRoutines(folder.id, this.routines()); break;
       case 'reorder-folders':  this.actions.openReorderFolders(this.allFolders()); break;
       case 'delete':           this.actions.confirmDeleteFolder(folder); break;
     }

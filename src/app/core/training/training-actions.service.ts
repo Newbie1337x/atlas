@@ -100,15 +100,15 @@ export class TrainingActionsService {
   }
 
   /**
-   * Reorder routines inside a folder. The backend's PUT /routines/:id
-   * requires the full body (title + exercises + sets), so we can't
-   * PATCH just displayOrder from the summary. Workaround: GET each
-   * moved routine's detail, mutate displayOrder, PUT back. GETs +
-   * PUTs both fire in parallel. Untouched routines skipped. See
-   * memory: gym-reorder-routines-in-folder for the real fix
-   * (dedicated PATCH endpoint).
+   * Reorder routines inside a folder in ONE round-trip via
+   * PATCH /api/training/routines/folder/:folderId/order — the server
+   * runs the whole batch in a single transaction. folderId=null for
+   * the loose "Mis rutinas" bucket.
    */
-  async openReorderRoutines(routines: readonly { id: number; title: string; displayOrder: number }[]): Promise<void> {
+  async openReorderRoutines(
+    folderId: number | null,
+    routines: readonly { id: number; title: string; displayOrder: number }[],
+  ): Promise<void> {
     if (routines.length < 2) return;
     const draft = [...routines];
     const m = await this.modal.create({
@@ -125,13 +125,12 @@ export class TrainingActionsService {
     });
     await m.present();
     await m.onDidDismiss();
-    const puts = await Promise.all(draft.map(async (routine, idx) => {
-      if (routine.displayOrder === idx) return null;
-      const detail = await firstValueFrom(this.api.getRoutine(routine.id));
-      return firstValueFrom(this.api.updateRoutine(
-        routine.id, toUpdateRequest(detail, { displayOrder: idx })));
-    }));
-    if (puts.some(p => p !== null)) await this.invalidate();
+    // No-op if the order didn't actually change (idx === original).
+    const changed = draft.some((r, idx) => r.displayOrder !== idx);
+    if (!changed) return;
+    await firstValueFrom(
+      this.api.reorderRoutinesInFolder(folderId, draft.map(r => r.id)));
+    await this.invalidate();
   }
 
   async confirmDeleteFolder(folder: RoutineFolder): Promise<void> {
@@ -172,19 +171,18 @@ export class TrainingActionsService {
   }
 
   /**
-   * Rename lives on the detail page — we already have the full routine
-   * so we can spread it into the PUT without a second fetch. The API
-   * enforces title as the only required field; everything else is
-   * preserved verbatim.
+   * Rename uses the metadata PATCH — a tiny body instead of shipping
+   * the whole routine tree. Accepts either a summary or a detail; only
+   * id + title are read.
    */
-  async promptRenameRoutine(routine: RoutineDetail): Promise<void> {
+  async promptRenameRoutine(routine: { id: number; title: string }): Promise<void> {
     const title = await this.promptText({
       header: 'Renombrar rutina',
       value: routine.title,
       placeholder: 'Nombre',
     });
     if (!title || title === routine.title) return;
-    await firstValueFrom(this.api.updateRoutine(routine.id, toUpdateRequest(routine, { title })));
+    await firstValueFrom(this.api.patchRoutineMetadata(routine.id, { title }));
     await this.invalidate();
   }
 
