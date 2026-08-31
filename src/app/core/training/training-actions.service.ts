@@ -99,6 +99,41 @@ export class TrainingActionsService {
     }
   }
 
+  /**
+   * Reorder routines inside a folder. The backend's PUT /routines/:id
+   * requires the full body (title + exercises + sets), so we can't
+   * PATCH just displayOrder from the summary. Workaround: GET each
+   * moved routine's detail, mutate displayOrder, PUT back. GETs +
+   * PUTs both fire in parallel. Untouched routines skipped. See
+   * memory: gym-reorder-routines-in-folder for the real fix
+   * (dedicated PATCH endpoint).
+   */
+  async openReorderRoutines(routines: readonly { id: number; title: string; displayOrder: number }[]): Promise<void> {
+    if (routines.length < 2) return;
+    const draft = [...routines];
+    const m = await this.modal.create({
+      component: ReorderModalComponent,
+      componentProps: {
+        title: 'Reordenar rutinas',
+        items: () => draft,
+        labelFn: (r: { title: string }) => r.title,
+        onMove: (from: number, to: number) => {
+          const [item] = draft.splice(from, 1);
+          draft.splice(to, 0, item);
+        },
+      },
+    });
+    await m.present();
+    await m.onDidDismiss();
+    const puts = await Promise.all(draft.map(async (routine, idx) => {
+      if (routine.displayOrder === idx) return null;
+      const detail = await firstValueFrom(this.api.getRoutine(routine.id));
+      return firstValueFrom(this.api.updateRoutine(
+        routine.id, toUpdateRequest(detail, { displayOrder: idx })));
+    }));
+    if (puts.some(p => p !== null)) await this.invalidate();
+  }
+
   async confirmDeleteFolder(folder: RoutineFolder): Promise<void> {
     const ok = await this.confirm({
       header: 'Borrar carpeta',

@@ -9,6 +9,7 @@ import { addIcons } from 'ionicons';
 import {
   chevronDown, chevronForward, ellipsisVertical,
   pencilOutline, addCircleOutline, trashOutline,
+  reorderThreeOutline, swapVerticalOutline,
 } from 'ionicons/icons';
 import { RoutineFolder } from '@core/training/folder.model';
 import { RoutineSummary } from '@core/training/routine.model';
@@ -105,6 +106,9 @@ export class FolderSectionComponent {
   readonly routines = input.required<readonly RoutineSummary[]>();
   /** Undefined for the loose bucket. Presence gates the ellipsis menu. */
   readonly folder = input<RoutineFolder | null>(null);
+  /** Full folder list — needed so "Reordenar carpetas" inside the ⋮
+   *  menu can operate on every folder, not just this one. */
+  readonly allFolders = input<readonly RoutineFolder[]>([]);
 
   private readonly actions = inject(TrainingActionsService);
   private readonly sheets = inject(SelectSheetService);
@@ -120,6 +124,8 @@ export class FolderSectionComponent {
       'pencil-outline': pencilOutline,
       'add-circle-outline': addCircleOutline,
       'trash-outline': trashOutline,
+      'reorder-three-outline': reorderThreeOutline,
+      'swap-vertical-outline': swapVerticalOutline,
     });
   }
 
@@ -128,23 +134,34 @@ export class FolderSectionComponent {
   }
 
   protected async openMenu(folder: RoutineFolder): Promise<void> {
+    const options = [
+      { label: 'Renombrar',                     value: 'rename',
+        leadingIcon: 'pencil-outline' },
+      { label: 'Nueva rutina en esta carpeta',  value: 'new',
+        leadingIcon: 'add-circle-outline' },
+    ];
+    if (this.routines().length >= 2) {
+      options.push({ label: 'Reordenar rutinas', value: 'reorder-routines',
+        leadingIcon: 'reorder-three-outline' });
+    }
+    if (this.allFolders().length >= 2) {
+      options.push({ label: 'Reordenar carpetas', value: 'reorder-folders',
+        leadingIcon: 'swap-vertical-outline' });
+    }
+    options.push({ label: 'Borrar carpeta', value: 'delete',
+      leadingIcon: 'trash-outline', destructive: true } as never);
     const picked = await this.sheets.open(this.vcr, {
       header: 'Opciones de la carpeta',
       subtitle: folder.name,
       value: '',
-      options: [
-        { label: 'Renombrar',                     value: 'rename',
-          leadingIcon: 'pencil-outline' },
-        { label: 'Nueva rutina en esta carpeta',  value: 'new',
-          leadingIcon: 'add-circle-outline' },
-        { label: 'Borrar carpeta',                value: 'delete',
-          leadingIcon: 'trash-outline', destructive: true },
-      ],
+      options,
     });
     switch (picked) {
-      case 'rename': this.actions.promptRenameFolder(folder); break;
-      case 'new':    this.actions.promptCreateRoutine(folder.id); break;
-      case 'delete': this.actions.confirmDeleteFolder(folder); break;
+      case 'rename':           this.actions.promptRenameFolder(folder); break;
+      case 'new':              this.actions.promptCreateRoutine(folder.id); break;
+      case 'reorder-routines': this.actions.openReorderRoutines(this.routines()); break;
+      case 'reorder-folders':  this.actions.openReorderFolders(this.allFolders()); break;
+      case 'delete':           this.actions.confirmDeleteFolder(folder); break;
     }
   }
 }
