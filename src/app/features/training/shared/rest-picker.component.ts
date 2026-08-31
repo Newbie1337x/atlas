@@ -191,6 +191,16 @@ export class RestPickerComponent {
     effect(() => this.draft.set(this.value() ?? 0));
   }
 
+  /** Set to true while we own a pushed history entry — Android's back
+   *  gesture / browser back pops it and closes the sheet instead of
+   *  navigating the page. Cleared when we pop it ourselves in dispose. */
+  private historyPushed = false;
+  private readonly popHandler = () => {
+    this.historyPushed = false;
+    window.removeEventListener('popstate', this.popHandler);
+    this.dispose();
+  };
+
   protected open(): void {
     if (this.overlayRef) return;   // already open
     this.overlayRef = this.overlay.create({
@@ -204,6 +214,10 @@ export class RestPickerComponent {
     });
     this.overlayRef.attach(new TemplatePortal(this.sheetTpl, this.vcr));
     this.overlayRef.backdropClick().subscribe(() => this.cancel());
+
+    history.pushState({ sheet: 'rest' }, '');
+    this.historyPushed = true;
+    window.addEventListener('popstate', this.popHandler);
 
     // Position the wheel at the current value after Angular has rendered
     // the template into the overlay.
@@ -223,6 +237,11 @@ export class RestPickerComponent {
   private dispose(): void {
     this.overlayRef?.dispose();
     this.overlayRef = null;
+    if (this.historyPushed) {
+      this.historyPushed = false;
+      window.removeEventListener('popstate', this.popHandler);
+      history.back();
+    }
   }
 
   private jumpToCurrent(): void {

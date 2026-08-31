@@ -68,35 +68,46 @@ export class SelectSheetService {
     ref.setInput('value', config.value);
 
     return new Promise((resolve) => {
+      // Consume the system back gesture: push a history entry so the
+      // next back pop closes the sheet instead of navigating the page.
+      let historyOwned = true;
+      history.pushState({ sheet: 'select' }, '');
+      const popHandler = () => {
+        historyOwned = false;
+        done(null);
+      };
+      window.addEventListener('popstate', popHandler);
+
       let closing = false;
-      const done = async (v: string | null, viaDrag = false) => {
-        if (closing) return;   // guard against double-fire (backdrop + drag race)
+      const done = async (v: string | null) => {
+        if (closing) return;   // guard against double-fire
         closing = true;
+        window.removeEventListener('popstate', popHandler);
+        // Detach the CDK backdrop AND kill the overlay pane's pointer
+        // events immediately — otherwise the still-present pane
+        // (.cdk-overlay-pane has pointer-events: auto by default)
+        // eats the tap during the 220ms close animation.
         overlayRef.detachBackdrop();
         overlayRef.overlayElement.style.pointerEvents = 'none';
-        // Drag-close already moved the sheet visually; skip the extra
-        // animation and dispose the overlay immediately so no CDK
-        // artefact hangs around eating the next tap.
-        if (viaDrag) {
-          overlayRef.dispose();
-          resolve(v);
-          return;
+        // Pop our history entry synchronously so back-stack stays clean.
+        if (historyOwned) {
+          historyOwned = false;
+          history.back();
         }
         await ref.instance.animateClose();
         overlayRef.dispose();
         resolve(v);
       };
       ref.instance.picked.subscribe(v => done(v));
-      // Drag-dismiss animates via the drag itself; tell done() to skip
-      // the extra slide-down + await window so no CDK layer lingers
-      // eating the next tap on the row of ⋮ dots.
-      ref.instance.dismissed.subscribe(() => done(null, true));
+      ref.instance.dismissed.subscribe(() => done(null));
       overlayRef.backdropClick().subscribe(() => done(null));
-      // NB: back-gesture-closes-sheet (history.pushState + popstate)
-      // was pulled out because history.back()'s async popstate raced
-      // with the next sheet's open — first tap on ⋮ appeared to do
-      // nothing. Drag-to-close, backdrop tap, and option tap cover
-      // 90% of the intent; system back navigates away as usual.
+      // KNOWN BUG (parked): rapid tap on the next ⋮ opener immediately
+      // after drag-closing sometimes requires two taps — the first
+      // seems to be eaten by something in the CDK stack. Not caused by
+      // the history integration (persisted with it removed), not
+      // caused by animateClose alone (persisted with dispose-only).
+      // Needs deeper investigation. See memory:
+      // gym-sheet-double-tap-after-drag-close
     });
   }
 }
