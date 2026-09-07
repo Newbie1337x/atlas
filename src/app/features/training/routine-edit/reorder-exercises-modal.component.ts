@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, ViewChild, TemplateRef, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input, OnInit, ViewChild, TemplateRef, computed, signal } from '@angular/core';
 import { RoutineEditFormService } from './routine-edit-form.service';
 import { RoutineExercise } from '@core/training/routine.model';
 import { ReorderModalComponent } from '@shared/ui/reorder-modal.component';
@@ -32,27 +32,34 @@ import { ExerciseIconComponent } from '../shared/exercise-icon.component';
       [iconTemplate]="iconTpl" />
   `,
 })
-export class ReorderExercisesModalComponent {
-  /** Signal input (not classic @Input) so the computed below can read it
-   *  reactively. Classic @Input on this component was undefined at the
-   *  moment `computed(...)` ran its factory for the first time — if the
-   *  first evaluation happened before ModalController's componentProps
-   *  assignment, the computed captured zero dependencies (short-circuit
-   *  on `undefined?.draft()`) and never re-ran, so the modal opened
-   *  with a snapshot missing whichever exercise landed last. Signal
-   *  inputs are set via ComponentRef.setInput, which Ionic 8 wires
-   *  through for componentProps, and their read registers a dep the
-   *  computed can invalidate on. */
-  readonly form = input.required<RoutineEditFormService>();
+export class ReorderExercisesModalComponent implements OnInit {
+  /** Assigned by ModalController.componentProps as a plain property write.
+   *  Signal inputs would be cleaner but Ionic's overlay controller does
+   *  not route componentProps through ComponentRef.setInput, so the
+   *  signal never receives the value and reads throw. Classic @Input +
+   *  ngOnInit mirror is the reliable path. */
+  @Input({ required: true }) form!: RoutineEditFormService;
+
+  /** Mirror of the form input, seeded in ngOnInit so any `computed()`
+   *  that depends on the service becomes reactive once the input lands.
+   *  Reading `this.form` directly inside a class-field `computed(...)`
+   *  observed `undefined` before ModalController assigned it, captured
+   *  zero deps, and never re-ran — the modal opened with a stale/empty
+   *  list forever. */
+  private readonly formSignal = signal<RoutineEditFormService | null>(null);
 
   @ViewChild('icon', { static: true }) protected iconTpl!: TemplateRef<{ $implicit: RoutineExercise }>;
 
   protected readonly itemsFn = computed<readonly RoutineExercise[]>(
-    () => this.form().draft()?.exercises ?? []);
+    () => this.formSignal()?.draft()?.exercises ?? []);
   protected readonly labelFn = (ex: RoutineExercise): string =>
     ex.exerciseName ?? `Ejercicio #${ex.exerciseId}`;
   protected readonly moveFn = (from: number, to: number): void =>
-    this.form().moveExercise(from, to);
+    this.form.moveExercise(from, to);
   protected readonly removeFn = (index: number): void =>
-    this.form().removeExercise(index);
+    this.form.removeExercise(index);
+
+  ngOnInit(): void {
+    this.formSignal.set(this.form);
+  }
 }
