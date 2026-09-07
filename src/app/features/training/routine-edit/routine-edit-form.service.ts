@@ -68,6 +68,26 @@ export class RoutineEditFormService {
     this._dirty.set(false);
   }
 
+  /** Seed an empty draft for "new routine" mode. id=0 flags the draft
+   *  as unpersisted so the editor page routes to POST instead of PUT
+   *  on save; no backend call happens until the user hits Guardar. */
+  startEmpty(folderId: number | null = null): void {
+    this._draft.set({
+      id: 0,
+      organizationId: 0,
+      ownerType: 'MEMBER',
+      ownerGlobalProfileId: 0,
+      sourceRoutineId: null,
+      title: '',
+      notes: null,
+      folderId,
+      displayOrder: 0,
+      exercises: [],
+    });
+    this._originalById.set(new Map());
+    this._dirty.set(false);
+  }
+
   // ---------- Routine header ----------
 
   updateTitle(title: string): void {

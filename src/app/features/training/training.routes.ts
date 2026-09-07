@@ -18,6 +18,14 @@ export const trainingRoutes: Routes = [
   { path: 'session',           loadComponent: () => import('./session.page').then((m) => m.SessionPage) },
   { path: 'routines/:id',      loadComponent: () => import('./routine-detail.page').then((m) => m.RoutineDetailPage) },
   {
+    // "new" is a reserved id — the editor treats it as create mode:
+    // seeds an empty draft locally, POSTs on save, no backend call
+    // until Guardar. See RoutineEditPage.isCreate().
+    path: 'routines/new/edit',
+    loadComponent: () => import('./routine-edit.page').then((m) => m.RoutineEditPage),
+    canDeactivate: [routineEditDeactivateGuard],
+  },
+  {
     path: 'routines/:id/edit',
     loadComponent: () => import('./routine-edit.page').then((m) => m.RoutineEditPage),
     canDeactivate: [routineEditDeactivateGuard],

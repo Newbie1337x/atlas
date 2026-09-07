@@ -149,18 +149,12 @@ export class TrainingActionsService {
 
   // ---------- Routines ----------
 
-  /** Creates a blank routine on the backend with a placeholder title
-   *  and drops the user into the editor. Title + exercises are edited
-   *  in-place; Guardar in the editor gates on having ≥1 exercise so an
-   *  empty routine never gets promoted to a saved state the user cares
-   *  about. If the user backs out before adding anything, the placeholder
-   *  routine stays in the list — same behavior as any manually-emptied
-   *  routine. */
+  /** Route to the editor in create mode — NO backend call happens
+   *  until the user hits Guardar. Back / discard leaves nothing behind. */
   async promptCreateRoutine(folderId: number | null = null): Promise<void> {
-    const created = await firstValueFrom(
-      this.api.createRoutine({ title: 'Nueva rutina', folderId }));
-    await this.invalidate();
-    this.router.navigate(['/training/routines', created.id, 'edit']);
+    this.router.navigate(
+      ['/training/routines/new/edit'],
+      folderId != null ? { queryParams: { folder: folderId } } : {});
   }
 
   /** Accepts either shape (summary or detail) — only title + id are used. */

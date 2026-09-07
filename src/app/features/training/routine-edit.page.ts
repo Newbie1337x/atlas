@@ -119,10 +119,21 @@ export class RoutineEditPage {
     return !!d && d.exercises.length > 0 && !!d.title?.trim();
   });
 
+  /** True when the URL is /training/routines/new/edit — no backend fetch,
+   *  editor seeds an empty draft locally and POSTs on save. */
+  protected readonly isCreate = (): boolean => this.route.snapshot.url[1]?.path === 'new';
+
   protected readonly routineId = computed(() => {
+    if (this.isCreate()) return NaN;
     const raw = this.route.snapshot.paramMap.get('id');
     return raw ? Number(raw) : NaN;
   });
+
+  /** Optional folderId when creating via "Nueva rutina en esta carpeta". */
+  private readonly initialFolderId = (): number | null => {
+    const raw = this.route.snapshot.queryParamMap.get('folder');
+    return raw ? Number(raw) : null;
+  };
 
   protected readonly query = injectQuery(() => ({
     queryKey: trainingKeys.routineDetail(this.routineId()),
@@ -139,10 +150,18 @@ export class RoutineEditPage {
     // Seed the draft once the query resolves. Runs again if the id changes
     // (unlikely — this page is one route with one id — but the effect is
     // idempotent because loadFrom replaces the whole draft).
-    effect(() => {
-      const data = this.query.data();
-      if (data) this.form.loadFrom(data);
-    });
+    if (this.isCreate()) {
+      // Local-only draft, no fetch. Save() will POST.
+      this.form.startEmpty(this.initialFolderId());
+    } else {
+      // Seed the draft once the query resolves. Runs again if the id changes
+      // (unlikely — this page is one route with one id — but the effect is
+      // idempotent because loadFrom replaces the whole draft).
+      effect(() => {
+        const data = this.query.data();
+        if (data) this.form.loadFrom(data);
+      });
+    }
   }
 
   protected async openPicker(): Promise<void> {
@@ -190,7 +209,13 @@ export class RoutineEditPage {
    *  the fact that guard's alert is the same code path. Small
    *  double-check race is fine — worst case one extra tap on Cancelar. */
   protected async cancel(): Promise<void> {
-    this.router.navigate(['/training/routines', this.routineId()]);
+    // Create mode has no persisted routine to return to — go back to the
+    // training list. Edit mode returns to the routine detail.
+    if (this.isCreate()) {
+      this.router.navigate(['/training']);
+    } else {
+      this.router.navigate(['/training/routines', this.routineId()]);
+    }
   }
 
   protected async save(): Promise<void> {
@@ -198,12 +223,25 @@ export class RoutineEditPage {
     if (!draft) return;
     this.saving.set(true);
     try {
-      await firstValueFrom(this.api.updateRoutine(draft.id, toUpdateRequest(draft)));
+      // Create mode: POST with title + folderId, then PUT the exercises
+      // in a second call. Two calls because CreateRoutineRequest does
+      // not accept a nested exercise tree; keeps the endpoint contract
+      // narrow and reuses the update path we already trust.
+      let savedId = draft.id;
+      if (savedId === 0) {
+        const created = await firstValueFrom(this.api.createRoutine({
+          title: draft.title,
+          folderId: draft.folderId,
+          notes: draft.notes ?? undefined,
+        }));
+        savedId = created.id;
+      }
+      await firstValueFrom(this.api.updateRoutine(savedId, toUpdateRequest(draft)));
       await this.queryClient.invalidateQueries({ queryKey: trainingKeys.all });
       // Clear dirty before navigating so the deactivate guard doesn't
       // prompt "descartar cambios?" over a just-saved routine.
       this.form.markPristine();
-      this.router.navigate(['/training/routines', draft.id]);
+      this.router.navigate(['/training/routines', savedId]);
     } finally {
       this.saving.set(false);
     }
