@@ -108,7 +108,9 @@ import { ReorderExercisesModalComponent } from './reorder-exercises-modal.compon
         <training-rest-picker
           [value]="exercise().restSeconds"
           [subtitle]="exerciseName()"
-          (valueChange)="form.updateExerciseRest(index(), $event)" />
+          [sets]="exercise().sets"
+          (valueChange)="form.updateExerciseRest(index(), $event)"
+          (setRestChange)="form.updateSet(index(), $event.index, { restSecondsAfter: $event.value })" />
 
         <ion-input
           label="Notas"
@@ -134,8 +136,8 @@ import { ReorderExercisesModalComponent } from './reorder-exercises-modal.compon
               <ion-icon name="caret-down" aria-hidden="true" />
             </span>
           }
+          @if (caps().duration && !caps().reps) { <span>Tiempo</span> }
           @if (showRpe() && caps().rpe) { <span>RPE</span> }
-          <span></span>
         </div>
 
         @for (s of exercise().sets; track $index) {
@@ -235,8 +237,9 @@ export class ExerciseEditorComponent {
   protected readonly showRpe = signal<boolean>(false);
 
   /** Grid template mirrors the set-editor row: Serie | [Kg] | [Reps] |
-   *  [RPE] | (×). Middle columns collapse when caps say the exercise
-   *  doesn't support them. */
+   *  [Tiempo] | [RPE]. Middle columns collapse when caps say the
+   *  exercise doesn't support them. Must stay in lock-step with
+   *  set-editor's own gridTemplate — same cols in same order. */
   protected readonly gridTemplate = computed(() => {
     const c = this.caps();
     const serie = '48px';
@@ -244,9 +247,9 @@ export class ExerciseEditorComponent {
     const reps = c.reps
       ? (this.repsMode() === 'RANGE' ? '1.4fr' : '1fr')
       : '';
+    const duration = (c.duration && !c.reps) ? '1fr' : '';
     const rpe = (this.showRpe() && c.rpe) ? '60px' : '';
-    const remove = '32px';
-    return [serie, kg, reps, rpe, remove].filter(Boolean).join(' ');
+    return [serie, kg, reps, duration, rpe].filter(Boolean).join(' ');
   });
 
   /** Guards the show-RPE inference so a set edit does not fight the

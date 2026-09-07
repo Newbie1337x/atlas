@@ -87,6 +87,8 @@ export interface RoutineSet {
   targetDurationSeconds: number | null;
   targetDistanceKm: number | null;
   targetRpe: number | null;
+  /** Nullable — null means inherit RoutineExercise.restSeconds; a value overrides the rest AFTER this set only. */
+  restSecondsAfter: number | null;
 }
 
 /** One exercise in a routine (enriched with name + iconUrl + capabilities). */
@@ -159,6 +161,7 @@ export interface UpdateRoutineRequest {
       targetDurationSeconds?: number | null;
       targetDistanceKm?: number | null;
       targetRpe?: number | null;
+      restSecondsAfter?: number | null;
     }>;
   }>;
 }

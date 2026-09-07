@@ -149,6 +149,20 @@ const CLASS_BY_TYPE: Partial<Record<SetType, string>> = {
         }
       }
 
+      <!-- Duration — rendered when caps allow it (isometric holds:
+           plank, l-sit, wall sit) and reps aren't the active mode.
+           Input accepts mm:ss OR raw seconds; parsed by seconds(). -->
+      @if (caps().duration && !caps().reps) {
+        <ion-input
+          type="text"
+          inputmode="numeric"
+          (ionFocus)="clearOnFocus($event)"
+          [placeholder]="placeholderFor('duration', 'seg')"
+          aria-label="Duración"
+          [ngModel]="displayedDuration()"
+          (ngModelChange)="onDurationChange($event)" />
+      }
+
       @if (showRpe() && caps().rpe) {
         <ion-input
           type="text"
@@ -197,6 +211,14 @@ export class SetEditorComponent {
     return bw > 0 ? kg / bw : null;
   });
 
+  /** Duration rendered in mm:ss when >= 60s, else raw seconds. Same
+   *  input accepts either format on the way in (see onDurationChange). */
+  protected readonly displayedDuration = computed<string>(() => {
+    const s = this.set().targetDurationSeconds;
+    if (s == null) return '';
+    return s < 60 ? String(s) : formatMmSs(s);
+  });
+
   /** Resolved caps — never null in the template; falls back permissively. */
   protected readonly caps = computed(() => this.capabilities() ?? PERMISSIVE_CAPS);
 
@@ -234,9 +256,11 @@ export class SetEditorComponent {
     return options;
   });
 
-  /** Column layout: Serie | [Kg] | [Reps] | [RPE] | (×). Any of the
-   *  three middle columns collapses out of the grid entirely when the
-   *  exercise's capabilities do not support it. */
+  /** Column layout: Serie | [Kg] | [Reps] | [Tiempo] | [RPE]. Any
+   *  middle column collapses out of the grid when caps say the
+   *  exercise doesn't use that metric. Tiempo only shows when the
+   *  exercise supports duration AND reps isn't its primary metric
+   *  (isometric holds — plank, l-sit, wall sit). */
   protected readonly gridTemplate = computed(() => {
     const c = this.caps();
     const serie = '48px';
@@ -244,8 +268,9 @@ export class SetEditorComponent {
     const reps = c.reps
       ? (this.repsMode() === 'RANGE' ? '1.4fr' : '1fr')
       : '';
+    const duration = (c.duration && !c.reps) ? '1fr' : '';
     const rpe = (this.showRpe() && c.rpe) ? '60px' : '';
-    return [serie, kg, reps, rpe].filter(Boolean).join(' ');
+    return [serie, kg, reps, duration, rpe].filter(Boolean).join(' ');
   });
 
   /** Single-mode reps: mirror into both min and max so the backend keeps
@@ -261,6 +286,12 @@ export class SetEditorComponent {
     const n = this.numeric(raw);
     const kg = n == null ? null : (this.isBricks() ? n * this.brickWeightKg() : n);
     this.patchSet.emit({ targetWeightKg: kg });
+  }
+
+  /** Duration parses "1:30" as 90 seconds, or a raw number as seconds.
+   *  Persists as int seconds in targetDurationSeconds. */
+  protected onDurationChange(raw: unknown): void {
+    this.patchSet.emit({ targetDurationSeconds: parseMmSs(raw) });
   }
 
   protected patch(p: Partial<RoutineSet>): void {
@@ -305,6 +336,10 @@ export class SetEditorComponent {
         return bw > 0 ? String(kg / bw) : '';
       }
       return String(kg);
+    }
+    if (name === 'duration') {
+      const s = original.targetDurationSeconds;
+      return s == null ? '' : (s < 60 ? String(s) : formatMmSs(s));
     }
     const raw = name === 'repsMax' ? original.targetRepsMax
               : name === 'rpe'     ? original.targetRpe
@@ -360,4 +395,37 @@ export class SetEditorComponent {
     return Number.isFinite(n) ? n : null;
   }
 
+}
+
+/**
+ * Format a positive int of seconds as "m:ss". Under 60s we return the
+ * raw number instead so short holds read as "30" not "0:30".
+ * Undefined → ''.
+ */
+function formatMmSs(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Parse the duration input. Accepts:
+ *   "90"    → 90     (raw seconds)
+ *   "1:30"  → 90     (mm:ss)
+ *   "1:5"   → 65     (mm:ss with 1-digit seconds still valid)
+ *   ""      → null
+ * Invalid input → null so the model clears instead of holding garbage.
+ */
+function parseMmSs(raw: unknown): number | null {
+  if (raw == null || raw === '') return null;
+  const str = String(raw).trim();
+  if (str.includes(':')) {
+    const [mmStr, ssStr = '0'] = str.split(':');
+    const mm = Number(mmStr);
+    const ss = Number(ssStr);
+    if (!Number.isFinite(mm) || !Number.isFinite(ss) || ss < 0 || ss >= 60) return null;
+    return Math.max(0, Math.trunc(mm * 60 + ss));
+  }
+  const n = Number(str);
+  return Number.isFinite(n) && n >= 0 ? Math.trunc(n) : null;
 }

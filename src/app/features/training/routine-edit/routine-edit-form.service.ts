@@ -203,5 +203,6 @@ function emptySet(orderIndex: number): RoutineSet {
     setType: 'WORKING' as SetType,
     targetRepsMin: null, targetRepsMax: null, targetWeightKg: null,
     targetDurationSeconds: null, targetDistanceKm: null, targetRpe: null,
+    restSecondsAfter: null,
   };
 }

@@ -295,6 +295,7 @@ export function toUpdateRequest(
         targetDurationSeconds: s.targetDurationSeconds,
         targetDistanceKm: s.targetDistanceKm,
         targetRpe: s.targetRpe,
+        restSecondsAfter: s.restSecondsAfter,
       })),
     })),
     ...overrides,
