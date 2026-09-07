@@ -29,7 +29,7 @@ import { WeightModePickerService } from '../shared/weight-mode-picker.service';
 import { ExerciseIconComponent } from '../shared/exercise-icon.component';
 import { RestPickerComponent } from '../shared/rest-picker.component';
 import { SelectSheetService } from '@shared/ui/select-sheet.service';
-import { ReorderExercisesModalComponent } from './reorder-exercises-modal.component';
+import { ReorderModalComponent } from '@shared/ui/reorder-modal.component';
 
 /**
  * One exercise inside the routine editor. Header shows the name + a single
@@ -381,11 +381,30 @@ export class ExerciseEditorComponent {
   }
 
   private async openReorder(): Promise<void> {
-    // Modal cannot inject the page-scoped form service via DI — pass it
-    // through componentProps so both sides mutate the same draft.
+    // Same pattern as TrainingActionsService.openReorderFolders — hand
+    // the shared ReorderModalComponent a plain snapshot arrow so ion-
+    // header/content/footer are direct children of ion-modal (Ionic
+    // needs that to fill the viewport). Wrapping the shared modal in a
+    // second component broke the footer's bottom-anchored layout.
+    const draft: RoutineExercise[] = [...(this.form.draft()?.exercises ?? [])];
     const modal = await this.modal.create({
-      component: ReorderExercisesModalComponent,
-      componentProps: { form: this.form },
+      component: ReorderModalComponent,
+      componentProps: {
+        title: 'Reordenar ejercicios',
+        items: () => draft,
+        labelFn: (ex: RoutineExercise) =>
+          ex.exerciseName ?? `Ejercicio #${ex.exerciseId}`,
+        onMove: (from: number, to: number) => {
+          if (from === to) return;
+          const [item] = draft.splice(from, 1);
+          draft.splice(to, 0, item);
+          this.form.moveExercise(from, to);
+        },
+        onRemove: (index: number) => {
+          draft.splice(index, 1);
+          this.form.removeExercise(index);
+        },
+      },
     });
     await modal.present();
   }

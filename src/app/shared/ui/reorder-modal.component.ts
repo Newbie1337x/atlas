@@ -84,7 +84,7 @@ import { removeCircle, reorderThree } from 'ionicons/icons';
 
     <ion-content>
       <div cdkDropList (cdkDropListDropped)="onDrop($event)">
-        @for (item of items(); track $index) {
+        @for (item of items(); track item) {
           <div
             class="row"
             cdkDrag
