@@ -105,18 +105,18 @@ import { ReorderModalComponent } from '@shared/ui/reorder-modal.component';
       </ion-card-header>
 
       <ion-card-content>
+        <ion-input
+          label="Notas"
+          labelPlacement="stacked"
+          [ngModel]="exercise().notes"
+          (ngModelChange)="form.updateExerciseNotes(index(), $event)" />
+
         <app-training-rest-picker
           [value]="exercise().restSeconds"
           [subtitle]="exerciseName()"
           [sets]="exercise().sets"
           (valueChange)="form.updateExerciseRest(index(), $event)"
           (setRestChange)="form.updateSet(index(), $event.index, { restSecondsAfter: $event.value })" />
-
-        <ion-input
-          label="Notas"
-          labelPlacement="stacked"
-          [ngModel]="exercise().notes"
-          (ngModelChange)="form.updateExerciseNotes(index(), $event)" />
 
         <div class="header-legend" [style.grid-template-columns]="gridTemplate()">
           <span>Serie</span>
