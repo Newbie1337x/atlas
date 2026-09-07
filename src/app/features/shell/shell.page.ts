@@ -1,5 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { filter, map, startWith } from 'rxjs';
 import { IonNote, IonRouterOutlet } from '@ionic/angular';
 import { NetworkService } from '@core/network/network.service';
 
@@ -76,10 +78,12 @@ import { NetworkService } from '@core/network/network.service';
       </ion-note>
     }
 
-    <div class="secondary-actions">
-      <a routerLink="/notifications" routerLinkActive="active">🔔 Notificaciones</a>
-      <a routerLink="/chat"          routerLinkActive="active">💬 Chat</a>
-    </div>
+    @if (showSecondary()) {
+      <div class="secondary-actions">
+        <a routerLink="/notifications" routerLinkActive="active">🔔 Notificaciones</a>
+        <a routerLink="/chat"          routerLinkActive="active">💬 Chat</a>
+      </div>
+    }
 
     <div class="main-content">
       <ion-router-outlet></ion-router-outlet>
@@ -98,6 +102,19 @@ import { NetworkService } from '@core/network/network.service';
 })
 export class ShellPage {
   protected readonly network = inject(NetworkService);
+  private readonly router = inject(Router);
+
+  /** Hide the Notificaciones / Chat strip on immersive editors where
+   *  every pixel counts (routine editor is the current one). Add more
+   *  routes here as they need the full canvas. */
+  protected readonly showSecondary = toSignal(
+    this.router.events.pipe(
+      filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+      map(e => !/\/edit(\/|$)/.test(e.urlAfterRedirects)),
+      startWith(!/\/edit(\/|$)/.test(this.router.url)),
+    ),
+    { initialValue: true },
+  );
 
   /**
    * Primary tabs — everything else lives OUTSIDE the bottom nav to keep it
