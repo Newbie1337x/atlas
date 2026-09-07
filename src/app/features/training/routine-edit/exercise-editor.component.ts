@@ -394,6 +394,8 @@ export class ExerciseEditorComponent {
         items: () => draft,
         labelFn: (ex: RoutineExercise) =>
           ex.exerciseName ?? `Ejercicio #${ex.exerciseId}`,
+        iconInitialFn: (ex: RoutineExercise) =>
+          ex.exerciseName?.trim().charAt(0).toUpperCase() ?? null,
         onMove: (from: number, to: number) => {
           if (from === to) return;
           const [item] = draft.splice(from, 1);

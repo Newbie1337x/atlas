@@ -1,8 +1,4 @@
-import {
-  ChangeDetectionStrategy, Component, Input, TemplateRef,
-  inject, input,
-} from '@angular/core';
-import { NgTemplateOutlet } from '@angular/common';
+import { ChangeDetectionStrategy, Component, Input, inject } from '@angular/core';
 import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import {
   IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon,
@@ -36,7 +32,7 @@ import { removeCircle, reorderThree } from 'ionicons/icons';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    NgTemplateOutlet, DragDropModule,
+    DragDropModule,
     IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon,
     IonContent, IonFooter,
   ],
@@ -61,6 +57,22 @@ import { removeCircle, reorderThree } from 'ionicons/icons';
     .remove-btn {
       --padding-start: 6px;
       --padding-end: 6px;
+    }
+    /* Tiny letter-badge — mirrors the visual weight of the small
+     * <app-training-exercise-icon> without pulling a training-scoped
+     * component into shared/ui. The initial alone is enough at this
+     * size; the badge just anchors the row visually. */
+    .initial-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: var(--ion-color-step-100, #eef2f7);
+      color: var(--ion-color-primary, #3b82f6);
+      font-size: 12px;
+      font-weight: 600;
+      flex-shrink: 0;
     }
     .cdk-drag-preview {
       box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
@@ -99,8 +111,11 @@ import { removeCircle, reorderThree } from 'ionicons/icons';
                 <ion-icon slot="icon-only" name="remove-circle" color="danger" />
               </ion-button>
             }
-            @if (iconTemplate) {
-              <ng-container *ngTemplateOutlet="iconTemplate; context: { $implicit: item }" />
+            @if (iconInitialFn; as f) {
+              @let ini = f(item);
+              @if (ini) {
+                <span class="initial-badge" aria-hidden="true">{{ ini }}</span>
+              }
             }
             <span class="name">{{ labelFn(item) }}</span>
             <ion-icon name="reorder-three" class="drag-hint" aria-hidden="true" />
@@ -130,8 +145,9 @@ export class ReorderModalComponent<T> {
   @Input({ required: true }) onMove!: (from: number, to: number) => void;
   /** Optional — when set, each row renders a red minus button. */
   @Input() onRemove?: (index: number) => void;
-  /** Optional per-row icon template. Receives the item as $implicit. */
-  @Input() iconTemplate?: TemplateRef<{ $implicit: T }>;
+  /** Optional — when set, each row renders a small circular badge with the
+   *  returned character (usually the first letter of the item's name). */
+  @Input() iconInitialFn?: (item: T) => string | null;
 
   private readonly modal = inject(ModalController);
 
