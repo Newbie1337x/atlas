@@ -5,7 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import { injectQuery, injectQueryClient } from '@tanstack/angular-query-experimental';
 import {
   IonHeader, IonToolbar, IonTitle, IonButtons, IonButton,
-  IonContent, IonInput, IonTextarea, IonNote, IonSpinner, IonIcon,
+  IonContent, IonInput, IonNote, IonSpinner, IonIcon,
   AlertController, ModalController,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
@@ -41,7 +41,7 @@ import { ExercisePickerComponent } from './routine-edit/exercise-picker.componen
   imports: [
     FormsModule,
     IonHeader, IonToolbar, IonTitle, IonButtons, IonButton,
-    IonContent, IonInput, IonTextarea, IonNote, IonSpinner, IonIcon,
+    IonContent, IonInput, IonNote, IonSpinner, IonIcon,
     ExerciseEditorComponent,
   ],
   template: `
@@ -78,14 +78,6 @@ import { ExercisePickerComponent } from './routine-edit/exercise-picker.componen
           labelPlacement="stacked"
           [ngModel]="d.title"
           (ngModelChange)="form.updateTitle($event)" />
-
-        <ion-textarea
-          label="Notas"
-          labelPlacement="stacked"
-          [autoGrow]="true"
-          [rows]="1"
-          [ngModel]="d.notes"
-          (ngModelChange)="form.updateNotes($event)" />
 
         @for (ex of d.exercises; track $index) {
           <app-training-exercise-editor [exercise]="ex" [index]="$index" />
