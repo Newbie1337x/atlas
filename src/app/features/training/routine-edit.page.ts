@@ -62,7 +62,7 @@ import { ExercisePickerComponent } from './routine-edit/exercise-picker.componen
             <ion-icon slot="icon-only" name="chevron-back-outline" />
           </ion-button>
         </ion-buttons>
-        <ion-title>Editar rutina</ion-title>
+        <ion-title>{{ isCreate() ? 'Crear rutina' : 'Editar rutina' }}</ion-title>
         <ion-buttons slot="end">
           <ion-button
             [disabled]="!canSave()"
@@ -76,9 +76,9 @@ import { ExercisePickerComponent } from './routine-edit/exercise-picker.componen
     </ion-header>
 
     <ion-content class="ion-padding">
-      @if (query.isPending()) {
+      @if (!isCreate() && query.isPending()) {
         <ion-spinner />
-      } @else if (query.isError()) {
+      } @else if (!isCreate() && query.isError()) {
         <ion-note color="danger">No pudimos cargar la rutina.</ion-note>
       } @else if (form.draft(); as d) {
         <ion-input
