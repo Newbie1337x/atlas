@@ -279,34 +279,25 @@ export function toUpdateRequest(
     notes: routine.notes,
     folderId: routine.folderId,
     displayOrder: routine.displayOrder,
-    exercises: routine.exercises.map(ex => {
-      // Strip set fields the exercise doesn't accept — the backend guard
-      // (ExerciseCapabilityGuard) rejects any set that carries values
-      // outside its caps, and stale routines from before the guard existed
-      // can otherwise fail to save with "weight not allowed" etc. When caps
-      // are null (old server / cold cache) trust the client and pass every
-      // field through.
-      const caps = ex.capabilities;
-      return {
-        orderIndex: ex.orderIndex,
-        exerciseId: ex.exerciseId,
-        restSeconds: ex.restSeconds,
-        supersetGroupId: ex.supersetGroupId,
-        notes: ex.notes,
-        repsMode: ex.repsMode,
-        sets: ex.sets.map(s => ({
-          orderIndex: s.orderIndex,
-          setType: s.setType,
-          targetRepsMin: caps && !caps.reps ? null : s.targetRepsMin,
-          targetRepsMax: caps && !caps.reps ? null : s.targetRepsMax,
-          targetWeightKg: caps && !caps.weight ? null : s.targetWeightKg,
-          targetDurationSeconds: caps && !caps.duration ? null : s.targetDurationSeconds,
-          targetDistanceKm: caps && !caps.distance ? null : s.targetDistanceKm,
-          targetRpe: caps && !caps.rpe ? null : s.targetRpe,
-          restSecondsAfter: s.restSecondsAfter,
-        })),
-      };
-    }),
+    exercises: routine.exercises.map(ex => ({
+      orderIndex: ex.orderIndex,
+      exerciseId: ex.exerciseId,
+      restSeconds: ex.restSeconds,
+      supersetGroupId: ex.supersetGroupId,
+      notes: ex.notes,
+      repsMode: ex.repsMode,
+      sets: ex.sets.map(s => ({
+        orderIndex: s.orderIndex,
+        setType: s.setType,
+        targetRepsMin: s.targetRepsMin,
+        targetRepsMax: s.targetRepsMax,
+        targetWeightKg: s.targetWeightKg,
+        targetDurationSeconds: s.targetDurationSeconds,
+        targetDistanceKm: s.targetDistanceKm,
+        targetRpe: s.targetRpe,
+        restSecondsAfter: s.restSecondsAfter,
+      })),
+    })),
     ...overrides,
   };
 }
