@@ -223,25 +223,18 @@ export class RoutineEditPage {
     if (!draft) return;
     this.saving.set(true);
     try {
-      // Create mode: POST with title + folderId, then PUT the exercises
-      // in a second call. Two calls because CreateRoutineRequest does
-      // not accept a nested exercise tree; keeps the endpoint contract
-      // narrow and reuses the update path we already trust.
-      let savedId = draft.id;
-      if (savedId === 0) {
-        const created = await firstValueFrom(this.api.createRoutine({
-          title: draft.title,
-          folderId: draft.folderId,
-          notes: draft.notes ?? undefined,
-        }));
-        savedId = created.id;
-      }
-      await firstValueFrom(this.api.updateRoutine(savedId, toUpdateRequest(draft)));
+      // POST for create (draft.id === 0) or PUT for update — both take
+      // the same full-tree body (backend @NotEmpty on exercises applies
+      // to both paths, so we never send a hollow routine to the server).
+      const body = toUpdateRequest(draft);
+      const saved = draft.id === 0
+        ? await firstValueFrom(this.api.createRoutine(body))
+        : await firstValueFrom(this.api.updateRoutine(draft.id, body));
       await this.queryClient.invalidateQueries({ queryKey: trainingKeys.all });
       // Clear dirty before navigating so the deactivate guard doesn't
       // prompt "descartar cambios?" over a just-saved routine.
       this.form.markPristine();
-      this.router.navigate(['/training/routines', savedId]);
+      this.router.navigate(['/training/routines', saved.id]);
     } finally {
       this.saving.set(false);
     }

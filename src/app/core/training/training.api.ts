@@ -59,13 +59,9 @@ export class TrainingApi {
   }
 
   createRoutine(body: CreateRoutineRequest): Observable<RoutineDetail> {
-    // Returns the enriched RoutineResponse — callers that just care about
-    // success can ignore it, `promptCreateRoutine` uses `.id` to route
-    // straight into the editor.
-    return this.http.post<RoutineDetail>(`${this.baseUrl}/api/training/routines`, {
-      ...body,
-      exercises: body.exercises ?? [],
-    });
+    // Returns the enriched RoutineResponse — callers use `.id` to route
+    // into the newly-created routine's detail page.
+    return this.http.post<RoutineDetail>(`${this.baseUrl}/api/training/routines`, body);
   }
 
   deleteRoutine(id: number): Observable<void> {

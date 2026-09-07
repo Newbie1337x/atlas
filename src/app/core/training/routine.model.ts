@@ -122,17 +122,12 @@ export interface RoutineDetail {
 }
 
 /**
- * Minimal shape for creating a routine from the training list. Full editing
- * (exercises + sets) reuses the update DTO — the routine editor sends the
- * whole exercises array on PUT.
+ * POST body for /api/training/routines — same wire shape as the PUT
+ * body since the backend enforces @NotEmpty on `exercises` for both
+ * paths. The routine editor sends the full tree at Guardar time; no
+ * "create empty then patch" round-trip.
  */
-export interface CreateRoutineRequest {
-  title: string;
-  folderId?: number | null;
-  displayOrder?: number;
-  notes?: string;
-  exercises?: never[];
-}
+export type CreateRoutineRequest = UpdateRoutineRequest;
 
 /**
  * Full-body PUT for updating a routine. Backend requires title; everything
