@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, Input, ViewChild, TemplateRef } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input, ViewChild, TemplateRef, computed } from '@angular/core';
 import { RoutineEditFormService } from './routine-edit-form.service';
 import { RoutineExercise } from '@core/training/routine.model';
 import { ReorderModalComponent } from '@shared/ui/reorder-modal.component';
@@ -37,9 +37,13 @@ export class ReorderExercisesModalComponent {
 
   @ViewChild('icon', { static: true }) protected iconTpl!: TemplateRef<{ $implicit: RoutineExercise }>;
 
-  /** Arrow properties so they're bound to `this` — safe to pass as callbacks. */
-  protected readonly itemsFn = (): readonly RoutineExercise[] =>
-    this.form.draft()?.exercises ?? [];
+  /** Computed (not plain arrow) so signal reads INSIDE the getter tie the
+   *  modal's template to the form's draft. Plain function boundaries
+   *  break Angular's ambient signal tracking when the modal lives in a
+   *  detached ModalController tree — the modal was mounted with a stale
+   *  snapshot and never re-rendered on `addExercise` / `moveExercise`. */
+  protected readonly itemsFn = computed<readonly RoutineExercise[]>(
+    () => this.form.draft()?.exercises ?? []);
   protected readonly labelFn = (ex: RoutineExercise): string =>
     ex.exerciseName ?? `Ejercicio #${ex.exerciseId}`;
   protected readonly moveFn = (from: number, to: number): void =>
