@@ -5,7 +5,7 @@ import {
 import { FormsModule } from '@angular/forms';
 import {
   IonCard, IonCardHeader, IonCardTitle, IonCardContent,
-  IonButton, IonIcon, IonInput,
+  IonButton, IonIcon, IonTextarea,
   AlertController, ModalController,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
@@ -48,7 +48,7 @@ import { ReorderModalComponent } from '@shared/ui/reorder-modal.component';
   imports: [
     FormsModule,
     IonCard, IonCardHeader, IonCardTitle, IonCardContent,
-    IonButton, IonIcon, IonInput,
+    IonButton, IonIcon, IonTextarea,
     SetEditorComponent, ExerciseIconComponent, RestPickerComponent,
   ],
   styles: [`
@@ -114,9 +114,11 @@ import { ReorderModalComponent } from '@shared/ui/reorder-modal.component';
       </ion-card-header>
 
       <ion-card-content>
-        <ion-input
+        <ion-textarea
           class="notes-input"
           placeholder="Agregar notas de rutina aquí"
+          [autoGrow]="true"
+          [rows]="1"
           [ngModel]="exercise().notes"
           (ngModelChange)="form.updateExerciseNotes(index(), $event)" />
 
