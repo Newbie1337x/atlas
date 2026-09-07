@@ -65,7 +65,7 @@ import { ExercisePickerComponent } from './routine-edit/exercise-picker.componen
         <ion-title>Editar rutina</ion-title>
         <ion-buttons slot="end">
           <ion-button
-            [disabled]="!form.loaded() || saving()"
+            [disabled]="!canSave()"
             (click)="save()"
             aria-label="Guardar cambios">
             <ion-icon slot="start" name="checkmark-outline" />
@@ -109,6 +109,15 @@ export class RoutineEditPage {
   protected readonly form = inject(RoutineEditFormService);
 
   protected readonly saving = signal(false);
+
+  /** Gate on: draft loaded, not mid-save, at least one exercise, and a
+   *  non-empty title. Empty routines are useless to persist and the
+   *  backend @NotBlank on title would 422 anyway. */
+  protected readonly canSave = computed(() => {
+    if (!this.form.loaded() || this.saving()) return false;
+    const d = this.form.draft();
+    return !!d && d.exercises.length > 0 && !!d.title?.trim();
+  });
 
   protected readonly routineId = computed(() => {
     const raw = this.route.snapshot.paramMap.get('id');

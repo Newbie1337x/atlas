@@ -58,10 +58,11 @@ export class TrainingApi {
     return this.http.delete<void>(`${this.baseUrl}/api/training/folders/${id}`);
   }
 
-  createRoutine(body: CreateRoutineRequest): Observable<unknown> {
-    // Backend returns the enriched RoutineResponse but this endpoint's
-    // consumers only care that it succeeded — the training list refetches.
-    return this.http.post<unknown>(`${this.baseUrl}/api/training/routines`, {
+  createRoutine(body: CreateRoutineRequest): Observable<RoutineDetail> {
+    // Returns the enriched RoutineResponse — callers that just care about
+    // success can ignore it, `promptCreateRoutine` uses `.id` to route
+    // straight into the editor.
+    return this.http.post<RoutineDetail>(`${this.baseUrl}/api/training/routines`, {
       ...body,
       exercises: body.exercises ?? [],
     });

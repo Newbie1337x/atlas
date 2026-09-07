@@ -1,4 +1,5 @@
 import { Injectable, inject } from '@angular/core';
+import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { AlertController, ModalController, ToastController } from '@ionic/angular';
 import { injectQueryClient } from '@tanstack/angular-query-experimental';
@@ -35,6 +36,7 @@ export class TrainingActionsService {
   private readonly alerts = inject(AlertController);
   private readonly toasts = inject(ToastController);
   private readonly modal = inject(ModalController);
+  private readonly router = inject(Router);
 
   // ---------- Folders ----------
 
@@ -147,14 +149,18 @@ export class TrainingActionsService {
 
   // ---------- Routines ----------
 
+  /** Creates a blank routine on the backend with a placeholder title
+   *  and drops the user into the editor. Title + exercises are edited
+   *  in-place; Guardar in the editor gates on having ≥1 exercise so an
+   *  empty routine never gets promoted to a saved state the user cares
+   *  about. If the user backs out before adding anything, the placeholder
+   *  routine stays in the list — same behavior as any manually-emptied
+   *  routine. */
   async promptCreateRoutine(folderId: number | null = null): Promise<void> {
-    const title = await this.promptText({
-      header: 'Nueva rutina',
-      placeholder: 'Nombre (ej. Lunes - Pecho)',
-    });
-    if (!title) return;
-    await firstValueFrom(this.api.createRoutine({ title, folderId }));
+    const created = await firstValueFrom(
+      this.api.createRoutine({ title: 'Nueva rutina', folderId }));
     await this.invalidate();
+    this.router.navigate(['/training/routines', created.id, 'edit']);
   }
 
   /** Accepts either shape (summary or detail) — only title + id are used. */
