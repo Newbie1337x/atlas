@@ -1,12 +1,24 @@
-/* --- Row indicator (dot when any set has an override) --- */
+/* --- Compact rest row (replaces the older ion-item version) --- */
+.rest-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+  background: none;
+  border: 0;
+  color: var(--ion-color-primary, #3880ff);
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.rest-row ion-icon { font-size: 1.1rem; }
 .override-dot {
   display: inline-block;
   width: 6px;
   height: 6px;
-  margin-left: 6px;
   border-radius: 50%;
   background: var(--ion-color-primary, #3880ff);
-  vertical-align: middle;
 }
 
 /* --- Bottom sheet (rendered inside a CDK Overlay attached to body) --- */

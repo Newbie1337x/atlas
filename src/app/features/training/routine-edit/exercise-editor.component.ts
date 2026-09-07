@@ -79,6 +79,15 @@ import { ReorderModalComponent } from '@shared/ui/reorder-modal.component';
       color: var(--ion-color-primary, #3880ff);
     }
     .reps-header ion-icon, .weight-header ion-icon { font-size: 0.85em; }
+    .notes-input {
+      --padding-start: 0;
+      --padding-end: 0;
+      --padding-top: 2px;
+      --padding-bottom: 6px;
+      --placeholder-color: var(--ion-color-medium, #888);
+      --placeholder-opacity: 1;
+      font-size: 0.9rem;
+    }
   `],
   template: `
     <ion-card>
@@ -106,8 +115,8 @@ import { ReorderModalComponent } from '@shared/ui/reorder-modal.component';
 
       <ion-card-content>
         <ion-input
-          label="Notas"
-          labelPlacement="stacked"
+          class="notes-input"
+          placeholder="Agregar notas de rutina aquí"
           [ngModel]="exercise().notes"
           (ngModelChange)="form.updateExerciseNotes(index(), $event)" />
 

@@ -33,28 +33,24 @@ import { REST_OPTIONS, formatRestSeconds } from './rest-values';
   selector: 'app-training-rest-picker',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [OverlayModule, IonItem, IonLabel, IonIcon],
+  imports: [OverlayModule, IonIcon],
   styleUrl: './rest-picker.component.css',
   template: `
-    <ion-item
-      button [detail]="false"
+    <button
+      type="button"
+      class="rest-row"
       (click)="onRowClick()"
       (pointerdown)="onRowPointerDown($event)"
       (pointerup)="cancelLongPress()"
       (pointercancel)="cancelLongPress()"
       (pointerleave)="cancelLongPress()"
       (pointermove)="onRowPointerMove($event)">
-      <ion-icon slot="start" name="stopwatch-outline" aria-hidden="true" />
-      <ion-label>
-        <h3>
-          Descanso
-          @if (hasOverrides()) {
-            <span class="override-dot" aria-label="Algún set tiene descanso personalizado"></span>
-          }
-        </h3>
-        <p>{{ label() }}</p>
-      </ion-label>
-    </ion-item>
+      <ion-icon name="stopwatch-outline" aria-hidden="true" />
+      <span>Descanso: {{ label() }}</span>
+      @if (hasOverrides()) {
+        <span class="override-dot" aria-label="Algún set tiene descanso personalizado"></span>
+      }
+    </button>
 
     <ng-template #sheetTpl>
       <div class="sheet" role="dialog" aria-label="Elegir descanso">
