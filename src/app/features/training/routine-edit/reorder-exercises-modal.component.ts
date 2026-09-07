@@ -7,20 +7,20 @@ import { ExerciseIconComponent } from '../shared/exercise-icon.component';
 /**
  * Thin wrapper around the shared ReorderModalComponent — feeds it the
  * routine-edit form service's exercise list + move/remove operations
- * and passes an <training-exercise-icon> template for the row icons.
+ * and passes an <app-training-exercise-icon> template for the row icons.
  *
  * The RoutineEditFormService is scoped to the parent page and can't be
  * reached via inject() here (ModalController doesn't inherit injectors),
  * so it arrives via `@Input() form`.
  */
 @Component({
-  selector: 'training-reorder-exercises-modal',
+  selector: 'app-training-reorder-exercises-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [ReorderModalComponent, ExerciseIconComponent],
   template: `
     <ng-template #icon let-ex>
-      <training-exercise-icon [name]="ex.exerciseName" size="small" />
+      <app-training-exercise-icon [name]="ex.exerciseName" size="small" />
     </ng-template>
 
     <app-reorder-modal

@@ -13,7 +13,7 @@ import { ExerciseIconComponent } from '../shared/exercise-icon.component';
  * null when they don't apply to that set type.
  */
 @Component({
-  selector: 'training-routine-exercise-list',
+  selector: 'app-training-routine-exercise-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [IonList, IonItem, IonLabel, IonNote, ExerciseIconComponent],
@@ -40,7 +40,7 @@ import { ExerciseIconComponent } from '../shared/exercise-icon.component';
       <ion-list>
         @for (ex of exercises(); track ex.id) {
           <ion-item lines="full">
-            <training-exercise-icon slot="start" [name]="ex.exerciseName" size="small" />
+            <app-training-exercise-icon slot="start" [name]="ex.exerciseName" size="small" />
             <ion-label>
               <div class="ex-header">
                 <h3>{{ ex.orderIndex + 1 }}. {{ ex.exerciseName ?? 'Ejercicio #' + ex.exerciseId }}</h3>

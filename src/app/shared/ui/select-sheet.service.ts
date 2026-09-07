@@ -113,7 +113,7 @@ export class SelectSheetService {
 }
 
 @Component({
-  selector: 'training-select-sheet',
+  selector: 'app-select-sheet',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [OverlayModule, IonIcon],

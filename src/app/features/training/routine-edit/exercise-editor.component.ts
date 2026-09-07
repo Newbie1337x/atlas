@@ -42,7 +42,7 @@ import { ReorderExercisesModalComponent } from './reorder-exercises-modal.compon
  * the exercise input directly.
  */
 @Component({
-  selector: 'training-exercise-editor',
+  selector: 'app-training-exercise-editor',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
@@ -94,7 +94,7 @@ import { ReorderExercisesModalComponent } from './reorder-exercises-modal.compon
           (pointercancel)="cancelLongPress()"
           (pointerleave)="cancelLongPress()"
           (pointermove)="onHeaderPointerMove($event)">
-          <training-exercise-icon [name]="exercise().exerciseName" size="small" />
+          <app-training-exercise-icon [name]="exercise().exerciseName" size="small" />
           <ion-card-title>
             {{ (index() + 1) + '. ' + (exercise().exerciseName ?? 'Ejercicio #' + exercise().exerciseId) }}
           </ion-card-title>
@@ -105,7 +105,7 @@ import { ReorderExercisesModalComponent } from './reorder-exercises-modal.compon
       </ion-card-header>
 
       <ion-card-content>
-        <training-rest-picker
+        <app-training-rest-picker
           [value]="exercise().restSeconds"
           [subtitle]="exerciseName()"
           [sets]="exercise().sets"
@@ -141,7 +141,7 @@ import { ReorderExercisesModalComponent } from './reorder-exercises-modal.compon
         </div>
 
         @for (s of exercise().sets; track $index) {
-          <training-set-editor
+          <app-training-set-editor
             [set]="s"
             [index]="$index"
             [workingOrdinal]="workingOrdinals()[$index]"

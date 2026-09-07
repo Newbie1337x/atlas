@@ -80,7 +80,7 @@ import { RoutineExerciseListComponent } from './routine-detail/routine-exercise-
           Empezar rutina
         </ion-button>
 
-        <training-routine-exercise-list [exercises]="r.exercises" />
+        <app-training-routine-exercise-list [exercises]="r.exercises" />
       }
     </ion-content>
   `,

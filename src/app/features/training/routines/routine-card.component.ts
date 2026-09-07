@@ -23,7 +23,7 @@ import { SelectSheetService } from '@shared/ui/select-sheet.service';
  * this with icons + a proper card layout.
  */
 @Component({
-  selector: 'training-routine-card',
+  selector: 'app-training-routine-card',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, IonItem, IonLabel, IonNote, IonButton, IonIcon],

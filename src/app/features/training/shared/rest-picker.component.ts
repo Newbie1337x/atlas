@@ -30,7 +30,7 @@ import { REST_OPTIONS, formatRestSeconds } from './rest-values';
  * bar is the draft; Listo emits, backdrop tap cancels.
  */
 @Component({
-  selector: 'training-rest-picker',
+  selector: 'app-training-rest-picker',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [OverlayModule, IonItem, IonLabel, IonIcon],

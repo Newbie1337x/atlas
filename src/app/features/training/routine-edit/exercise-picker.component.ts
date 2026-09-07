@@ -25,7 +25,7 @@ import { ExerciseIconComponent } from '../shared/exercise-icon.component';
  * If catalogs grow we swap for a search endpoint.
  */
 @Component({
-  selector: 'training-exercise-picker',
+  selector: 'app-training-exercise-picker',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
@@ -63,7 +63,7 @@ import { ExerciseIconComponent } from '../shared/exercise-icon.component';
         <ion-list>
           @for (ex of filtered(); track ex.id) {
             <ion-item button (click)="dismiss(ex)">
-              <training-exercise-icon slot="start" [name]="ex.name" size="small" />
+              <app-training-exercise-icon slot="start" [name]="ex.name" size="small" />
               <ion-label>
                 <h3>{{ ex.name }}</h3>
                 @if (ex.primaryMuscles.length) {

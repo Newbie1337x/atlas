@@ -33,7 +33,7 @@ import { RoutineCardComponent } from './routine-card.component';
  * cold starts and reboots) when we add mobile persistence infra.
  */
 @Component({
-  selector: 'training-folder-section',
+  selector: 'app-training-folder-section',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
@@ -94,7 +94,7 @@ import { RoutineCardComponent } from './routine-card.component';
           <ion-note class="ion-padding-start">Carpeta vacía</ion-note>
         } @else {
           @for (r of routines(); track r.id) {
-            <training-routine-card [routine]="r" />
+            <app-training-routine-card [routine]="r" />
           }
         }
       }

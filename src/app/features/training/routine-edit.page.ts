@@ -86,7 +86,7 @@ import { ExercisePickerComponent } from './routine-edit/exercise-picker.componen
           (ngModelChange)="form.updateNotes($event)" />
 
         @for (ex of d.exercises; track $index) {
-          <training-exercise-editor [exercise]="ex" [index]="$index" />
+          <app-training-exercise-editor [exercise]="ex" [index]="$index" />
         }
 
         <ion-button expand="block" fill="outline" (click)="openPicker()">

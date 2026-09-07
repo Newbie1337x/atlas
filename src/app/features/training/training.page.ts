@@ -69,7 +69,7 @@ import { FolderSectionComponent } from './routines/folder-section.component';
           <ion-note>Todavía no tenés rutinas. Creá una para empezar.</ion-note>
         }
         @for (bucket of visibleBuckets(); track bucketKey(bucket)) {
-          <training-folder-section
+          <app-training-folder-section
             [label]="bucket.folder?.name ?? 'Mis rutinas'"
             [folder]="bucket.folder"
             [allFolders]="foldersQuery.data() ?? []"

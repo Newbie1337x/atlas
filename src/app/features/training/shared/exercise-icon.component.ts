@@ -16,7 +16,7 @@ import { barbellOutline } from 'ionicons/icons';
  * change.
  */
 @Component({
-  selector: 'training-exercise-icon',
+  selector: 'app-training-exercise-icon',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [IonIcon],

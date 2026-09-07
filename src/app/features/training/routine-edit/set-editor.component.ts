@@ -43,7 +43,7 @@ const CLASS_BY_TYPE: Partial<Record<SetType, string>> = {
  * apply to cardio / timed sets which the MVP does not surface.
  */
 @Component({
-  selector: 'training-set-editor',
+  selector: 'app-training-set-editor',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
