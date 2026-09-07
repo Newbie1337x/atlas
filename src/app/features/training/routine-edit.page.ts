@@ -44,6 +44,14 @@ import { ExercisePickerComponent } from './routine-edit/exercise-picker.componen
     IonContent, IonInput, IonNote, IonSpinner, IonIcon,
     ExerciseEditorComponent,
   ],
+  styles: [`
+    .title-input {
+      --padding-start: 0;
+      --padding-end: 0;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+  `],
   template: `
     <ion-header>
       <ion-toolbar>
@@ -74,8 +82,8 @@ import { ExercisePickerComponent } from './routine-edit/exercise-picker.componen
         <ion-note color="danger">No pudimos cargar la rutina.</ion-note>
       } @else if (form.draft(); as d) {
         <ion-input
-          label="Título"
-          labelPlacement="stacked"
+          class="title-input"
+          placeholder="Título de la rutina"
           [ngModel]="d.title"
           (ngModelChange)="form.updateTitle($event)" />
 
