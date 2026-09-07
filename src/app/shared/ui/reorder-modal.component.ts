@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, Input, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input, OnDestroy, OnInit, inject } from '@angular/core';
 import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import {
   IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon,
@@ -131,7 +131,7 @@ import { removeCircle, reorderThree } from 'ionicons/icons';
     </ion-footer>
   `,
 })
-export class ReorderModalComponent<T> {
+export class ReorderModalComponent<T> implements OnInit, OnDestroy {
   /**
    * Injected by the parent via ModalController.componentProps.
    * ModalController writes fields directly by name, so these are
@@ -166,5 +166,35 @@ export class ReorderModalComponent<T> {
 
   protected close(): void {
     this.modal.dismiss();
+  }
+
+  // ---------- Back-gesture / browser back closes the modal ----------
+
+  /** True while we own a history entry pushed on open — cleared when
+   *  popstate fires (user's back gesture / system back) or when we
+   *  pop it ourselves in ngOnDestroy after a manual close. */
+  private historyPushed = false;
+  private readonly popHandler = () => {
+    // Browser already popped the entry — flip the flag so ngOnDestroy
+    // does not try to pop again, then dismiss the modal.
+    this.historyPushed = false;
+    window.removeEventListener('popstate', this.popHandler);
+    this.modal.dismiss();
+  };
+
+  ngOnInit(): void {
+    history.pushState({ modal: 'reorder' }, '');
+    this.historyPushed = true;
+    window.addEventListener('popstate', this.popHandler);
+  }
+
+  ngOnDestroy(): void {
+    if (this.historyPushed) {
+      this.historyPushed = false;
+      window.removeEventListener('popstate', this.popHandler);
+      // Manual close (Listo / X button) — pop the entry we pushed so
+      // the page stack lines up again.
+      history.back();
+    }
   }
 }
