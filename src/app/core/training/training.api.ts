@@ -11,6 +11,7 @@ import {
   CreateRoutineRequest, RoutineDetail, RoutineSummary, UpdateRoutineRequest,
 } from './routine.model';
 import { UpsertWorkoutRequest, WorkoutDetail } from './workout.model';
+import { PersonalRecord } from './personal-record.model';
 
 /**
  * HTTP endpoints for the TRAINING module — routines + folders that the
@@ -145,5 +146,18 @@ export class TrainingApi {
   discardWorkout(id: string): Observable<void> {
     return this.http.post<void>(
       `${this.baseUrl}/api/training/workouts/${id}/discard`, {});
+  }
+
+  // --- Personal records ---
+
+  /** Batch fetch — every PR for every exercise in the list, one call.
+   *  Session tracker uses this at start-up to know which values would
+   *  count as a new PR mid-workout. */
+  listPersonalRecordsBatch(exerciseIds: readonly number[]): Observable<PersonalRecord[]> {
+    if (exerciseIds.length === 0) return of([]);
+    const params = new HttpParams()
+      .set('exerciseIds', exerciseIds.join(','));
+    return this.http.get<PersonalRecord[]>(
+      `${this.baseUrl}/api/training/personal-records/batch`, { params });
   }
 }

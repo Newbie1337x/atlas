@@ -102,6 +102,15 @@ const CLASS_BY_TYPE: Partial<Record<SetType, string>> = {
       color: #fff;
     }
     .check-btn ion-icon { font-size: 1.2rem; }
+    .check-cell {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .pr-badge {
+      font-size: 1rem;
+      line-height: 1;
+    }
   `],
   template: `
     <div class="row" [style.grid-template-columns]="gridTemplate()">
@@ -206,16 +215,22 @@ const CLASS_BY_TYPE: Partial<Record<SetType, string>> = {
 
       <!-- Session-mode check column. Present only when the parent
            opted in via showCheck. Toggling emits checkChange; the
-           session page mutates set.completed + kicks the rest timer. -->
+           session page mutates set.completed + kicks the rest timer.
+           When isPr is true, a 🏆 badge sits inline before the check. -->
       @if (showCheck()) {
-        <button
-          type="button"
-          class="check-btn"
-          [class.on]="!!set().completed"
-          [attr.aria-pressed]="!!set().completed"
-          (click)="checkChange.emit()">
-          <ion-icon name="checkmark-outline" aria-hidden="true" />
-        </button>
+        <span class="check-cell">
+          @if (isPr()) {
+            <span class="pr-badge" aria-label="Nuevo récord personal">🏆</span>
+          }
+          <button
+            type="button"
+            class="check-btn"
+            [class.on]="!!set().completed"
+            [attr.aria-pressed]="!!set().completed"
+            (click)="checkChange.emit()">
+            <ion-icon name="checkmark-outline" aria-hidden="true" />
+          </button>
+        </span>
       }
 
     </div>
@@ -240,6 +255,9 @@ export class SetEditorComponent {
   /** Session mode — when true, render the check column on the right
    *  and emit `checkChange` on tap. Off in the routine editor. */
   readonly showCheck = input<boolean>(false);
+  /** Session-only: when true, render a 🏆 badge next to the check —
+   *  the set's actuals beat this exercise's current PR client-side. */
+  readonly isPr = input<boolean>(false);
   readonly patchSet = output<Partial<RoutineSet>>();
   readonly remove = output<void>();
   readonly checkChange = output<void>();

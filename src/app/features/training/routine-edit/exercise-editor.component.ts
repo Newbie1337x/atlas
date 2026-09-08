@@ -17,8 +17,10 @@ import {
 import { firstValueFrom } from 'rxjs';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import {
-  ExerciseCapabilities, PERMISSIVE_CAPS, RepsMode, RoutineExercise,
+  ExerciseCapabilities, PERMISSIVE_CAPS, RepsMode, RoutineExercise, RoutineSet,
 } from '@core/training/routine.model';
+import { PersonalRecord } from '@core/training/personal-record.model';
+import { isPersonalRecord } from '../session/is-personal-record';
 import { InputMode } from '@core/training/exercise.model';
 import { TrainingActionsService } from '@core/training/training-actions.service';
 import { TrainingApi } from '@core/training/training.api';
@@ -133,6 +135,7 @@ import { ExercisePickerComponent } from './exercise-picker.component';
             [repsMode]="repsMode()"
             [showRpe]="showRpe()"
             [showCheck]="showCheck()"
+            [isPr]="isPr(s)"
             [capabilities]="caps()"
             [inputMode]="inputMode()"
             [brickWeightKg]="brickWeight()"
@@ -156,7 +159,16 @@ export class ExerciseEditorComponent {
    *  column. When a set is toggled, checkSet emits the set index so
    *  the SessionPage can mutate + kick its rest timer. */
   readonly showCheck = input<boolean>(false);
+  /** Session-only: PRs for THIS exercise (filtered by parent from the
+   *  batch fetch). Empty in editor mode. */
+  readonly personalRecords = input<readonly PersonalRecord[]>([]);
   readonly checkSet = output<number>();
+
+  /** Per-set PR flag — client-side preview. Recomputes when the draft
+   *  or the PR set changes. */
+  protected isPr(set: RoutineSet): boolean {
+    return this.showCheck() && isPersonalRecord(set, this.personalRecords());
+  }
 
   protected readonly form = inject(RoutineEditFormService);
   private readonly alerts = inject(AlertController);
