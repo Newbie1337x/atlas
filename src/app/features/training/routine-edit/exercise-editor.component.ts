@@ -109,10 +109,16 @@ import { ExercisePickerComponent } from './exercise-picker.component';
             }
           }
           @if (caps().reps) {
-            <span class="reps-header" (click)="openRepsOptions()">
-              {{ repsMode() === 'RANGE' ? 'Rango de reps' : 'Reps' }}
-              <ion-icon name="caret-down" aria-hidden="true" />
-            </span>
+            @if (showCheck()) {
+              <!-- Session mode: label only, no picker — the reps
+                   template lives in the editor, not the tracker. -->
+              <span>Reps</span>
+            } @else {
+              <span class="reps-header" (click)="openRepsOptions()">
+                {{ repsMode() === 'RANGE' ? 'Rango de reps' : 'Reps' }}
+                <ion-icon name="caret-down" aria-hidden="true" />
+              </span>
+            }
           }
           @if (caps().duration && !caps().reps) { <span>Tiempo</span> }
           @if (showRpe() && caps().rpe) { <span>RPE</span> }
@@ -313,24 +319,32 @@ export class ExerciseEditorComponent {
   }
 
   protected async openMenu(): Promise<void> {
+    // Session mode hides "Opciones de repeticiones" — the reps template
+    // (single vs range) is a routine-authoring decision, not something
+    // the user should be swapping mid-workout. Every other action still
+    // works: reorder / replace / superset / delete stay available so a
+    // spontaneous mid-session tweak persists via "Actualizar rutina?".
+    const options = [
+      ...(this.showCheck() ? [] : [
+        { label: 'Opciones de repeticiones', value: 'reps',
+          leadingIcon: 'repeat-outline' },
+      ]),
+      { label: this.showRpe() ? 'Ocultar RPE' : 'Mostrar RPE',
+        value: 'rpe', leadingIcon: 'speedometer-outline' },
+      { label: 'Reordenar ejercicios',     value: 'reorder',
+        leadingIcon: 'reorder-three-outline' },
+      { label: 'Reemplazar ejercicio',     value: 'replace',
+        leadingIcon: 'swap-horizontal-outline' },
+      { label: this.supersetLetter() ? 'Quitar de superserie' : 'Agregar a superserie',
+        value: 'superset', leadingIcon: 'link-outline' },
+      { label: 'Eliminar ejercicio',       value: 'delete',
+        leadingIcon: 'trash-outline', destructive: true },
+    ];
     const picked = await this.selectSheet.open(this.vcr, {
       header: 'Opciones del ejercicio',
       subtitle: this.exerciseName(),
       value: '',
-      options: [
-        { label: 'Opciones de repeticiones', value: 'reps',
-          leadingIcon: 'repeat-outline' },
-        { label: this.showRpe() ? 'Ocultar RPE' : 'Mostrar RPE',
-          value: 'rpe', leadingIcon: 'speedometer-outline' },
-        { label: 'Reordenar ejercicios',     value: 'reorder',
-          leadingIcon: 'reorder-three-outline' },
-        { label: 'Reemplazar ejercicio',     value: 'replace',
-          leadingIcon: 'swap-horizontal-outline' },
-        { label: this.supersetLetter() ? 'Quitar de superserie' : 'Agregar a superserie',
-          value: 'superset', leadingIcon: 'link-outline' },
-        { label: 'Eliminar ejercicio',       value: 'delete',
-          leadingIcon: 'trash-outline', destructive: true },
-      ],
+      options,
     });
     switch (picked) {
       case 'reps':     this.openRepsOptions(); break;

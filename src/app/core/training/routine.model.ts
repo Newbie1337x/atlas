@@ -95,6 +95,16 @@ export interface RoutineSet {
    *  form state powers both flows. Ignored by toUpdateRequest — the
    *  routines endpoint has no such field. */
   completed?: boolean;
+  /** Session-only actuals. What the user LOGGED for this set today,
+   *  distinct from the template's `target*` fields. Typing kg / reps
+   *  during a workout writes to these, not to the template — so the
+   *  routine template stays intact unless the user makes a structural
+   *  change (add/remove set, superset, etc). Editor ignores them via
+   *  toUpdateRequest; session's transform reads them with a target
+   *  fallback for sets the user checked-off without typing. */
+  actualReps?: number | null;
+  actualWeightKg?: number | null;
+  actualDurationSeconds?: number | null;
 }
 
 /** One exercise in a routine (enriched with name + iconUrl + capabilities). */

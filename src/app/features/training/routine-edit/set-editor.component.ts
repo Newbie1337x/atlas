@@ -119,24 +119,35 @@ const CLASS_BY_TYPE: Partial<Record<SetType, string>> = {
       </ion-button>
 
       <!-- Kg / Ladrillos — hidden entirely when the exercise doesn't support
-           weight. Mode toggle lives in the parent's header row, not here;
-           this cell just reflects the currently active mode. Persisted
-           target is always kg. -->
+           weight. Session mode binds to actualWeightKg (workout log) with
+           the target as placeholder; editor mode binds to targetWeightKg
+           directly. -->
       @if (caps().weight) {
         <ion-input
           type="text"
           inputmode="decimal"
           (ionFocus)="clearOnFocus($event)"
-          [placeholder]="placeholderFor('kg', isBricks() ? 'ladr' : 'kg')"
+          [placeholder]="weightPlaceholder()"
           [attr.aria-label]="isBricks() ? 'Cantidad de ladrillos' : 'Peso en kg'"
           [ngModel]="displayedWeight()"
           (ngModelChange)="onWeightChange($event)" />
       }
 
-      <!-- Reps: 1 or 2 inputs sharing a single grid cell. Hidden when
-           the exercise is duration/distance-only. -->
+      <!-- Reps: session mode always collapses to a single input showing
+           the range (or single target) as placeholder. Editor mode keeps
+           the two-input RANGE / single input SINGLE split for template
+           editing. -->
       @if (caps().reps) {
-        @if (repsMode() === 'RANGE') {
+        @if (showCheck()) {
+          <ion-input
+            type="text"
+            inputmode="numeric"
+            (ionFocus)="clearOnFocus($event)"
+            [placeholder]="repsPlaceholder()"
+            aria-label="Repeticiones realizadas"
+            [ngModel]="set().actualReps"
+            (ngModelChange)="patch({ actualReps: numeric($event) })" />
+        } @else if (repsMode() === 'RANGE') {
           <div class="reps-range">
             <ion-input
               type="text"
@@ -243,13 +254,42 @@ export class SetEditorComponent {
 
   protected readonly isBricks = computed(() => this.inputMode() === 'BRICKS');
 
-  /** What the input shows: kg raw, or kg÷brickWeight for bricks mode. */
+  /** What the input shows: kg raw, or kg÷brickWeight for bricks mode.
+   *  Session mode reads actualWeightKg (workout log); editor reads
+   *  targetWeightKg (template). */
   protected readonly displayedWeight = computed<number | null>(() => {
-    const kg = this.set().targetWeightKg;
+    const s = this.set();
+    const kg = this.showCheck() ? s.actualWeightKg : s.targetWeightKg;
     if (kg == null) return null;
-    if (!this.isBricks()) return kg;
+    if (!this.isBricks()) return Number(kg);
     const bw = this.brickWeightKg();
-    return bw > 0 ? kg / bw : null;
+    return bw > 0 ? Number(kg) / bw : null;
+  });
+
+  /** Session mode uses target as placeholder so the user sees the plan
+   *  while typing what they actually did. Editor keeps its own reference
+   *  system (last-saved value via placeholderFor). */
+  protected readonly weightPlaceholder = computed<string>(() => {
+    if (!this.showCheck()) {
+      return this.placeholderFor('kg', this.isBricks() ? 'ladr' : 'kg');
+    }
+    const t = this.set().targetWeightKg;
+    return t == null ? (this.isBricks() ? 'ladr' : 'kg') : String(t);
+  });
+
+  /** Session-mode reps placeholder: RANGE routines show "min-max"
+   *  (Hevy's convention), single routines show the raw target. */
+  protected readonly repsPlaceholder = computed<string>(() => {
+    const s = this.set();
+    if (this.repsMode() === 'RANGE') {
+      const lo = s.targetRepsMin, hi = s.targetRepsMax;
+      if (lo != null && hi != null) return `${lo}-${hi}`;
+      if (hi != null) return String(hi);
+      if (lo != null) return String(lo);
+    } else if (s.targetRepsMin != null) {
+      return String(s.targetRepsMin);
+    }
+    return 'reps';
   });
 
   /** Duration rendered in mm:ss when >= 60s, else raw seconds. Same
@@ -323,11 +363,14 @@ export class SetEditorComponent {
   }
 
   /** Weight input change — coerces to kg. In bricks mode multiplies by
-   *  the brick weight so the persisted `targetWeightKg` stays canonical. */
+   *  the brick weight so the persisted weight stays canonical. Session
+   *  mode writes actualWeightKg (workout log); editor writes
+   *  targetWeightKg (template). */
   protected onWeightChange(raw: unknown): void {
     const n = this.numeric(raw);
     const kg = n == null ? null : (this.isBricks() ? n * this.brickWeightKg() : n);
-    this.patchSet.emit({ targetWeightKg: kg });
+    this.patchSet.emit(
+      this.showCheck() ? { actualWeightKg: kg } : { targetWeightKg: kg });
   }
 
   /** Duration parses "1:30" as 90 seconds, or a raw number as seconds.

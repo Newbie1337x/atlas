@@ -174,22 +174,30 @@ export class SessionPage {
     this.destroyRef.onDestroy(() => clearInterval(tick));
   }
 
-  /** ExerciseEditor emits (checkSet)=setIndex when the shared SetEditor's
-   *  check column is tapped. Toggle the flag on the underlying set and
-   *  kick the rest timer if we just marked it done. Uses updateSetSilent
-   *  so a check-off doesn't count as a routine edit — the "actualizar
-   *  rutina?" prompt at Terminar only fires when the user changed
-   *  targets / added sets / etc, not for pure completion tracking. */
+  /** Toggle the check column on a set. On check-on: auto-fill actual*
+   *  from target so a user who just wants to log "did the planned set"
+   *  can tap once and move on; user can still edit actuals afterwards.
+   *  All fields are workout-only keys — form.updateSet knows not to
+   *  flip dirty, so the "actualizar rutina?" prompt at Terminar stays
+   *  reserved for structural changes. */
   protected onCheckSet(exerciseIndex: number, setIndex: number): void {
     const set = this.form.draft()?.exercises[exerciseIndex]?.sets[setIndex];
     if (!set) return;
     const wasCompleted = !!set.completed;
-    this.form.updateSetSilent(exerciseIndex, setIndex, { completed: !wasCompleted });
-    if (!wasCompleted) {
-      const exercise = this.form.draft()?.exercises[exerciseIndex];
-      const rest = set.restSecondsAfter ?? exercise?.restSeconds ?? 0;
-      if (rest > 0) this.restTimer.start(rest);
+    if (wasCompleted) {
+      this.form.updateSet(exerciseIndex, setIndex, { completed: false });
+      return;
     }
+    const targetReps = set.targetRepsMax ?? set.targetRepsMin ?? null;
+    this.form.updateSet(exerciseIndex, setIndex, {
+      completed: true,
+      actualReps: set.actualReps ?? targetReps,
+      actualWeightKg: set.actualWeightKg ?? set.targetWeightKg,
+      actualDurationSeconds: set.actualDurationSeconds ?? set.targetDurationSeconds,
+    });
+    const exercise = this.form.draft()?.exercises[exerciseIndex];
+    const rest = set.restSecondsAfter ?? exercise?.restSeconds ?? 0;
+    if (rest > 0) this.restTimer.start(rest);
   }
 
   /** Same picker + form.addExercise path the routine editor uses.

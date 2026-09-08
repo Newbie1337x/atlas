@@ -44,9 +44,13 @@ export function routineDraftToUpsertRequest(
         id: uuidV4(),
         orderIndex: s.orderIndex,
         setType: s.setType,
-        reps: pickReps(s),
-        weightKg: s.targetWeightKg == null ? null : Number(s.targetWeightKg),
-        durationSeconds: s.targetDurationSeconds,
+        // Session actuals win; fall back to the routine target for
+        // sets the user checked without typing.
+        reps: s.actualReps ?? pickReps(s),
+        weightKg: s.actualWeightKg != null
+          ? Number(s.actualWeightKg)
+          : (s.targetWeightKg == null ? null : Number(s.targetWeightKg)),
+        durationSeconds: s.actualDurationSeconds ?? s.targetDurationSeconds,
         distanceKm: s.targetDistanceKm == null ? null : Number(s.targetDistanceKm),
         rpe: s.targetRpe == null ? null : Number(s.targetRpe),
         actualRestSeconds: s.restSecondsAfter ?? ex.restSeconds ?? null,

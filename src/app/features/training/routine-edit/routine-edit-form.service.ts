@@ -3,6 +3,12 @@ import {
   ExerciseCapabilities, RepsMode, RoutineDetail, RoutineExercise, RoutineSet, SetType,
 } from '@core/training/routine.model';
 
+/** Set fields the SESSION mode writes to but the EDITOR / routine
+ *  template never sees. Patching only these keeps the dirty flag off. */
+const WORKOUT_ONLY_KEYS = new Set<string>([
+  'completed', 'actualReps', 'actualWeightKg', 'actualDurationSeconds',
+]);
+
 /**
  * Draft state for the routine editor. NOT providedIn:'root' — the page
  * that hosts the editor lists it in its `providers` array so the draft
@@ -268,25 +274,17 @@ export class RoutineEditFormService {
     }));
   }
 
-  updateSet(exerciseIndex: number, setIndex: number, patch: Partial<RoutineSet>): void {
-    this.updateExerciseAt(exerciseIndex, ex => ({
-      ...ex,
-      sets: ex.sets.map((s, i) => (i === setIndex ? { ...s, ...patch } : s)),
-    }));
-  }
-
   /**
-   * Mutate a set WITHOUT flipping the dirty flag. Only session mode
-   * uses this — a check-off toggle is workout-only bookkeeping (not
-   * a routine template edit) so it must not prompt "actualizar rutina?"
-   * at Terminar time. Editing a target reps / kg during session still
-   * goes through the plain updateSet (SetEditor's default output) and
-   * DOES flip dirty — that IS a routine change the user might want to
-   * persist to the template.
+   * Mutate a set. Flips dirty ONLY when the patch touches a template
+   * field (targets, setType, restSecondsAfter…) — pure workout-log
+   * changes (`completed`, `actualReps`, `actualWeightKg`,
+   * `actualDurationSeconds`) leave dirty alone so a check-off or a
+   * kg entry during session does not raise the "actualizar rutina?"
+   * prompt at Terminar. Structural changes (add/remove set, superset,
+   * repsMode swap) go through their own methods and mark dirty as
+   * usual.
    */
-  updateSetSilent(
-    exerciseIndex: number, setIndex: number, patch: Partial<RoutineSet>,
-  ): void {
+  updateSet(exerciseIndex: number, setIndex: number, patch: Partial<RoutineSet>): void {
     const current = this._draft();
     if (!current) return;
     this._draft.set({
@@ -296,6 +294,9 @@ export class RoutineEditFormService {
         sets: ex.sets.map((s, j) => (j === setIndex ? { ...s, ...patch } : s)),
       }),
     });
+    if (Object.keys(patch).some(k => !WORKOUT_ONLY_KEYS.has(k))) {
+      this._dirty.set(true);
+    }
   }
 
   // ---------- Internals ----------
