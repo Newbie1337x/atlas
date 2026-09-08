@@ -195,7 +195,7 @@ export class RoutineEditPage {
           ? '¿Descartar esta rutina nueva?'
           : '¿Descartar los cambios de la rutina?',
         message: creating
-          ? 'Todavía no se guardó — si salís ahora se pierde lo que armaste.'
+          ? 'Todavía no se guardó. Si sales ahora se pierde lo que creaste.'
           : undefined,
         buttons: [
           { text: creating ? 'Descartar rutina' : 'Descartar cambios',
