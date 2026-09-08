@@ -1,5 +1,6 @@
 import { RoutineDetail, RoutineSet } from '@core/training/routine.model';
 import { UpsertWorkoutRequest } from '@core/training/workout.model';
+import { uuidV4 } from '@core/uuid';
 
 /**
  * Transform the routine-shaped draft (mutated in place by the shared
@@ -33,14 +34,14 @@ export function routineDraftToUpsertRequest(
     startedAt,
     notes: draft.notes ?? undefined,
     exercises: draft.exercises.map(ex => ({
-      id: freshUuid(),
+      id: uuidV4(),
       orderIndex: ex.orderIndex,
       exerciseId: ex.exerciseId,
       supersetGroupId: ex.supersetGroupId,
       restSeconds: ex.restSeconds,
       notes: ex.notes,
       sets: ex.sets.map(s => ({
-        id: freshUuid(),
+        id: uuidV4(),
         orderIndex: s.orderIndex,
         setType: s.setType,
         reps: pickReps(s),
@@ -65,9 +66,3 @@ function pickReps(s: RoutineSet): number | null {
   return s.targetRepsMin ?? null;
 }
 
-/** RFC4122-lookalike — no secure context required (LAN IP / HTTP). */
-function freshUuid(): string {
-  return Math.random().toString(36).slice(2, 10)
-       + Date.now().toString(36)
-       + Math.random().toString(36).slice(2, 6);
-}

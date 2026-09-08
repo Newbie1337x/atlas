@@ -15,6 +15,7 @@ import { TrainingApi } from '@core/training/training.api';
 import { trainingKeys } from '@core/training/training.keys';
 import { HttpError } from '@core/errors/http-error';
 import { toUpdateRequest } from '@core/training/training-actions.service';
+import { uuidV4 } from '@core/uuid';
 import { RoutineEditFormService } from './routine-edit/routine-edit-form.service';
 import { ExerciseEditorComponent } from './routine-edit/exercise-editor.component';
 import { ExercisePickerComponent } from './routine-edit/exercise-picker.component';
@@ -122,7 +123,7 @@ export class SessionPage {
 
   /** Idempotency key for the workout on the backend. Minted once, sent
    *  in every upsert so retries / offline resend land on the same row. */
-  private readonly clientUuid = freshUuid();
+  private readonly clientUuid = uuidV4();
   private readonly startedAt = new Date();
 
   protected readonly elapsedSeconds = signal(0);
@@ -311,8 +312,3 @@ export class SessionPage {
   }
 }
 
-function freshUuid(): string {
-  return Math.random().toString(36).slice(2, 10)
-       + Date.now().toString(36)
-       + Math.random().toString(36).slice(2, 6);
-}
