@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import {
@@ -77,7 +77,7 @@ import { ExerciseIconComponent } from '../shared/exercise-icon.component';
     </ion-content>
   `,
 })
-export class ExercisePickerComponent {
+export class ExercisePickerComponent implements OnInit, OnDestroy {
   private readonly api = inject(TrainingApi);
   private readonly modal = inject(ModalController);
 
@@ -106,5 +106,30 @@ export class ExercisePickerComponent {
 
   protected dismiss(picked: CatalogExercise | null): void {
     this.modal.dismiss(picked);
+  }
+
+  // ---------- Back-gesture / browser back closes the picker ----------
+  // Same trick as ReorderModal + RestPicker: push a history entry on
+  // open, popstate → dismiss the modal (without navigating the
+  // underlying editor page), pop the entry ourselves on manual close.
+  private historyPushed = false;
+  private readonly popHandler = () => {
+    this.historyPushed = false;
+    window.removeEventListener('popstate', this.popHandler);
+    this.modal.dismiss(null);
+  };
+
+  ngOnInit(): void {
+    history.pushState({ modal: 'exercise-picker' }, '');
+    this.historyPushed = true;
+    window.addEventListener('popstate', this.popHandler);
+  }
+
+  ngOnDestroy(): void {
+    if (this.historyPushed) {
+      this.historyPushed = false;
+      window.removeEventListener('popstate', this.popHandler);
+      history.back();
+    }
   }
 }
