@@ -1,44 +1,73 @@
-import { UpsertWorkoutRequest, WorkoutDraft } from '@core/training/workout.model';
+import { RoutineDetail, RoutineSet } from '@core/training/routine.model';
+import { UpsertWorkoutRequest } from '@core/training/workout.model';
 
 /**
- * Map the client-side WorkoutDraft into the wire body expected by
- * PUT /api/training/workouts/:clientUuid. Strips the target* fields
- * the frontend uses for placeholders (server has them in the routine
- * template already) and drops nulls that Jackson would echo back.
+ * Transform the routine-shaped draft (mutated in place by the shared
+ * RoutineEditFormService while the user is training) into the workout
+ * upsert body the backend expects at PUT /workouts/:clientUuid.
  *
- * `completedAt` is null while the workout is in progress; the
- * separate POST /complete flips it server-side. Sending it here is
- * unnecessary for upsert.
+ * Field mapping:
+ *   routineSet.targetWeightKg      → workoutSet.weightKg     (actual)
+ *   routineSet.targetRepsMax/Min   → workoutSet.reps         (actual)
+ *   routineSet.targetDurationSecs  → workoutSet.durationSeconds
+ *   routineSet.targetDistanceKm    → workoutSet.distanceKm
+ *   routineSet.targetRpe           → workoutSet.rpe
+ *   routineSet.completed           → workoutSet.completed
+ *
+ * The frontend deliberately reuses the same SetEditor for both flows —
+ * during a session, whatever the user types INTO the "target" input IS
+ * the actual value they performed, so we ship it straight through.
+ *
+ * Set / exercise ids are minted here (workout tables use UUIDs); the
+ * routine's numeric ids are irrelevant to the workout row. clientUuid
+ * carried by the session page identifies the workout itself and stays
+ * stable across upserts.
  */
-export function sessionToUpsertRequest(
-  draft: WorkoutDraft,
+export function routineDraftToUpsertRequest(
+  draft: RoutineDetail,
+  startedAt: string,
 ): UpsertWorkoutRequest {
   return {
-    globalProfileId: 0, // Backend overrides from JWT
-    routineId: draft.routineId,
-    startedAt: draft.startedAt,
+    globalProfileId: 0, // backend overrides from JWT
+    routineId: draft.id > 0 ? draft.id : null,
+    startedAt,
     notes: draft.notes ?? undefined,
     exercises: draft.exercises.map(ex => ({
-      id: ex.id,
+      id: freshUuid(),
       orderIndex: ex.orderIndex,
       exerciseId: ex.exerciseId,
       supersetGroupId: ex.supersetGroupId,
       restSeconds: ex.restSeconds,
       notes: ex.notes,
       sets: ex.sets.map(s => ({
-        id: s.id,
+        id: freshUuid(),
         orderIndex: s.orderIndex,
         setType: s.setType,
-        reps: s.reps,
-        weightKg: s.weightKg,
-        durationSeconds: s.durationSeconds,
-        distanceKm: s.distanceKm,
-        rpe: s.rpe,
-        actualRestSeconds: s.actualRestSeconds,
-        inputMode: s.inputMode,
-        brickWeightKg: s.brickWeightKg,
-        completed: s.completed,
+        reps: pickReps(s),
+        weightKg: s.targetWeightKg == null ? null : Number(s.targetWeightKg),
+        durationSeconds: s.targetDurationSeconds,
+        distanceKm: s.targetDistanceKm == null ? null : Number(s.targetDistanceKm),
+        rpe: s.targetRpe == null ? null : Number(s.targetRpe),
+        actualRestSeconds: s.restSecondsAfter ?? ex.restSeconds ?? null,
+        inputMode: null,
+        brickWeightKg: null,
+        completed: !!s.completed,
       })),
     })),
   };
+}
+
+/** Range routines carry both min and max; use max (what the user was
+ *  aiming for) as the actual for the workout. Single mode mirrors
+ *  min===max via the editor, so both fields agree. */
+function pickReps(s: RoutineSet): number | null {
+  if (s.targetRepsMax != null) return s.targetRepsMax;
+  return s.targetRepsMin ?? null;
+}
+
+/** RFC4122-lookalike — no secure context required (LAN IP / HTTP). */
+function freshUuid(): string {
+  return Math.random().toString(36).slice(2, 10)
+       + Date.now().toString(36)
+       + Math.random().toString(36).slice(2, 6);
 }

@@ -89,6 +89,12 @@ export interface RoutineSet {
   targetRpe: number | null;
   /** Nullable — null means inherit RoutineExercise.restSeconds; a value overrides the rest AFTER this set only. */
   restSecondsAfter: number | null;
+  /** Session-only flag. Undefined / false while editing a routine
+   *  template; the workout tracker (SessionPage) reuses the same
+   *  SetEditor UI and toggles this via a check column so the same
+   *  form state powers both flows. Ignored by toUpdateRequest — the
+   *  routines endpoint has no such field. */
+  completed?: boolean;
 }
 
 /** One exercise in a routine (enriched with name + iconUrl + capabilities). */

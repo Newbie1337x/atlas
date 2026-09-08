@@ -14,35 +14,39 @@ import { checkmarkDoneOutline, chevronBackOutline } from 'ionicons/icons';
 import { TrainingApi } from '@core/training/training.api';
 import { trainingKeys } from '@core/training/training.keys';
 import { HttpError } from '@core/errors/http-error';
-import { SessionFormService } from './session/session-form.service';
+import { RoutineEditFormService } from './routine-edit/routine-edit-form.service';
+import { ExerciseEditorComponent } from './routine-edit/exercise-editor.component';
 import { RestTimerService } from './session/rest-timer.service';
-import { SessionExerciseCardComponent } from './session/session-exercise-card.component';
 import { SessionRestTimerComponent } from './session/session-rest-timer.component';
-import { sessionToUpsertRequest } from './session/session-to-upsert';
+import { routineDraftToUpsertRequest } from './session/session-to-upsert';
 
 /**
  * Active workout tracker. Route: /training/session/:routineId.
  *
- * Seed order:
- *   1. Fetch routine detail (same query as the editor caches).
- *   2. Mint a client UUID + startedAt once — form.seedFromRoutine.
- *   3. Render exercises + set rows. User checks off; rest timer kicks.
- *   4. Terminar → confirm → PUT /workouts/:uuid → POST /complete →
- *      navigate to detail. Descartar → confirm → POST /discard →
- *      navigate to /training.
+ * REUSES the routine editor UI verbatim — same ExerciseEditorComponent,
+ * same SetEditorComponent, same RoutineEditFormService. Session mode
+ * differs by exactly two things:
+ *   1. `showCheck=true` on the exercise editor renders a check column;
+ *      tapping it kicks the rest timer and stamps set.completed via
+ *      the shared form service (Partial<RoutineSet> already accepts
+ *      the new `completed` field).
+ *   2. Save doesn't PUT /routines — it transforms the routine-shaped
+ *      draft into a WorkoutRequest and hits PUT /workouts/:clientUuid
+ *      + POST /:uuid/complete.
  *
- * Single save at the end for MVP; upsert-per-set batching lands in
- * Slice B once we validate the flow feels right end-to-end.
+ * Everything editor gives you for free — add/remove sets, superset,
+ * replace exercise, reorder, notes — works mid-session too because
+ * the underlying service is the same instance.
  */
 @Component({
   selector: 'page-training-session',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  providers: [SessionFormService, RestTimerService],
+  providers: [RoutineEditFormService, RestTimerService],
   imports: [
     IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonContent,
     IonIcon, IonNote, IonSpinner,
-    SessionExerciseCardComponent, SessionRestTimerComponent,
+    ExerciseEditorComponent, SessionRestTimerComponent,
   ],
   styles: [`
     .elapsed {
@@ -61,8 +65,8 @@ import { sessionToUpsertRequest } from './session/session-to-upsert';
           </ion-button>
         </ion-buttons>
         <ion-title>
-          {{ form.draft()?.routineTitle ?? 'Entrenamiento' }}
-          <span class="elapsed">{{ elapsedMmss() }} · {{ form.completedCount() }}/{{ form.totalCount() }} series</span>
+          {{ form.draft()?.title ?? 'Entrenamiento' }}
+          <span class="elapsed">{{ elapsedMmss() }} · {{ completedCount() }}/{{ totalCount() }} series</span>
         </ion-title>
         <ion-buttons slot="end">
           <ion-button
@@ -82,8 +86,12 @@ import { sessionToUpsertRequest } from './session/session-to-upsert';
       } @else if (query.isError()) {
         <ion-note color="danger">No pudimos cargar la rutina.</ion-note>
       } @else if (form.draft(); as d) {
-        @for (ex of d.exercises; track ex.id) {
-          <app-training-session-exercise-card [exercise]="ex" [index]="$index" />
+        @for (ex of d.exercises; track $index) {
+          <app-training-exercise-editor
+            [exercise]="ex"
+            [index]="$index"
+            [showCheck]="true"
+            (checkSet)="onCheckSet($index, $event)" />
         }
       }
 
@@ -99,18 +107,16 @@ export class SessionPage {
   private readonly alerts = inject(AlertController);
   private readonly toasts = inject(ToastController);
   private readonly destroyRef = inject(DestroyRef);
-  protected readonly form = inject(SessionFormService);
+  private readonly restTimer = inject(RestTimerService);
+  protected readonly form = inject(RoutineEditFormService);
 
   protected readonly saving = signal(false);
 
-  /** Session identity — minted once on first render, stable across
-   *  re-renders. Passed to the backend as the idempotency key so
-   *  future upserts (Slice B) hit the same row. */
-  private readonly clientUuid = freshLocalId();
+  /** Idempotency key for the workout on the backend. Minted once, sent
+   *  in every upsert so retries / offline resend land on the same row. */
+  private readonly clientUuid = freshUuid();
   private readonly startedAt = new Date();
 
-  /** Elapsed session time in seconds. Tick every second so the header
-   *  counter animates live. */
   protected readonly elapsedSeconds = signal(0);
 
   protected readonly routineId = computed(() => {
@@ -124,18 +130,30 @@ export class SessionPage {
     enabled: Number.isFinite(this.routineId()),
   }));
 
+  /** Session-level totals for the header counter. */
+  protected readonly completedCount = computed(() => {
+    let n = 0;
+    for (const ex of this.form.draft()?.exercises ?? []) {
+      for (const s of ex.sets) if (s.completed) n++;
+    }
+    return n;
+  });
+  protected readonly totalCount = computed(() => {
+    let n = 0;
+    for (const ex of this.form.draft()?.exercises ?? []) n += ex.sets.length;
+    return n;
+  });
+
   constructor() {
     addIcons({
       'checkmark-done-outline': checkmarkDoneOutline,
       'chevron-back-outline': chevronBackOutline,
     });
 
-    // Seed the workout draft once the routine detail lands.
+    // Seed the shared form service from the routine detail once it lands.
     effect(() => {
       const data = this.query.data();
-      if (data && !this.form.loaded()) {
-        this.form.seedFromRoutine(data, this.clientUuid, this.startedAt);
-      }
+      if (data && !this.form.loaded()) this.form.loadFrom(data);
     });
 
     // Session cronómetro — 1s tick, cleaned up on destroy.
@@ -144,6 +162,21 @@ export class SessionPage {
       this.elapsedSeconds.set(Math.floor((Date.now() - startMs) / 1000));
     }, 1000);
     this.destroyRef.onDestroy(() => clearInterval(tick));
+  }
+
+  /** ExerciseEditor emits (checkSet)=setIndex when the shared SetEditor's
+   *  check column is tapped. Toggle the flag on the underlying set and
+   *  kick the rest timer if we just marked it done. */
+  protected onCheckSet(exerciseIndex: number, setIndex: number): void {
+    const set = this.form.draft()?.exercises[exerciseIndex]?.sets[setIndex];
+    if (!set) return;
+    const wasCompleted = !!set.completed;
+    this.form.updateSet(exerciseIndex, setIndex, { completed: !wasCompleted });
+    if (!wasCompleted) {
+      const exercise = this.form.draft()?.exercises[exerciseIndex];
+      const rest = set.restSecondsAfter ?? exercise?.restSeconds ?? 0;
+      if (rest > 0) this.restTimer.start(rest);
+    }
   }
 
   protected elapsedMmss(): string {
@@ -158,11 +191,8 @@ export class SessionPage {
 
   private confirming = false;
 
-  /** Shared with the CanDeactivate guard. Returns true when the user
-   *  agreed to leave (also POSTs discard so no zombie session lingers
-   *  server-side). */
   async confirmDiscardIfDirty(): Promise<boolean> {
-    if (!this.form.dirty()) return true;
+    if (this.completedCount() === 0 && !this.form.dirty()) return true;
     if (this.confirming) return false;
     this.confirming = true;
     try {
@@ -177,8 +207,8 @@ export class SessionPage {
       await alert.present();
       const { role } = await alert.onDidDismiss();
       if (role !== 'destructive') return false;
-      // Server-side discard is fire-and-forget — swallow errors so the
-      // user can leave even if the network is dead.
+      // Fire-and-forget; if the workout was never upserted server-side
+      // there is nothing to discard yet — swallow the 404.
       try { await firstValueFrom(this.api.discardWorkout(this.clientUuid)); }
       catch { /* ignore */ }
       this.form.markPristine();
@@ -198,7 +228,7 @@ export class SessionPage {
     if (!draft) return;
     const alert = await this.alerts.create({
       header: '¿Terminar entrenamiento?',
-      message: `${this.form.completedCount()} de ${this.form.totalCount()} series marcadas.`,
+      message: `${this.completedCount()} de ${this.totalCount()} series marcadas.`,
       buttons: [
         { text: 'Seguir entrenando', role: 'cancel' },
         { text: 'Terminar', role: 'confirm' },
@@ -215,12 +245,12 @@ export class SessionPage {
     if (!draft) return;
     this.saving.set(true);
     try {
-      await firstValueFrom(
-        this.api.upsertWorkout(this.clientUuid, sessionToUpsertRequest(draft)));
+      const body = routineDraftToUpsertRequest(draft, this.startedAt.toISOString());
+      await firstValueFrom(this.api.upsertWorkout(this.clientUuid, body));
       await firstValueFrom(this.api.completeWorkout(this.clientUuid));
       await this.queryClient.invalidateQueries({ queryKey: trainingKeys.all });
       this.form.markPristine();
-      this.router.navigate(['/training/routines', draft.routineId]);
+      this.router.navigate(['/training/routines', draft.id]);
     } catch (err) {
       const message = err instanceof HttpError
         ? err.userMessage
@@ -236,7 +266,8 @@ export class SessionPage {
   }
 }
 
-function freshLocalId(): string {
+function freshUuid(): string {
   return Math.random().toString(36).slice(2, 10)
-       + Date.now().toString(36);
+       + Date.now().toString(36)
+       + Math.random().toString(36).slice(2, 6);
 }

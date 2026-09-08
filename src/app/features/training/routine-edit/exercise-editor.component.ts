@@ -1,6 +1,6 @@
 import {
   ChangeDetectionStrategy, Component, ViewContainerRef,
-  computed, effect, inject, input, signal,
+  computed, effect, inject, input, output, signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
@@ -126,11 +126,13 @@ import { ExercisePickerComponent } from './exercise-picker.component';
             [exerciseName]="exerciseName()"
             [repsMode]="repsMode()"
             [showRpe]="showRpe()"
+            [showCheck]="showCheck()"
             [capabilities]="caps()"
             [inputMode]="inputMode()"
             [brickWeightKg]="brickWeight()"
             (patchSet)="form.updateSet(index(), $index, $event)"
-            (remove)="form.removeSet(index(), $index)" />
+            (remove)="form.removeSet(index(), $index)"
+            (checkChange)="checkSet.emit($index)" />
         }
 
         <ion-button expand="block" fill="outline" size="small" (click)="form.addSet(index())">
@@ -144,6 +146,11 @@ import { ExercisePickerComponent } from './exercise-picker.component';
 export class ExerciseEditorComponent {
   readonly exercise = input.required<RoutineExercise>();
   readonly index = input.required<number>();
+  /** Session mode — propagates to every SetEditor to render the check
+   *  column. When a set is toggled, checkSet emits the set index so
+   *  the SessionPage can mutate + kick its rest timer. */
+  readonly showCheck = input<boolean>(false);
+  readonly checkSet = output<number>();
 
   protected readonly form = inject(RoutineEditFormService);
   private readonly alerts = inject(AlertController);

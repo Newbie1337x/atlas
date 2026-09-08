@@ -3,7 +3,9 @@ import {
   computed, inject, input, output,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { IonInput, IonButton } from '@ionic/angular';
+import { IonInput, IonButton, IonIcon } from '@ionic/angular';
+import { addIcons } from 'ionicons';
+import { checkmarkOutline } from 'ionicons/icons';
 import {
   ExerciseCapabilities, PERMISSIVE_CAPS, RepsMode, RoutineSet, SetType,
 } from '@core/training/routine.model';
@@ -48,7 +50,7 @@ const CLASS_BY_TYPE: Partial<Record<SetType, string>> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
-    IonInput, IonButton,
+    IonInput, IonButton, IonIcon,
   ],
   styles: [`
     .row {
@@ -83,6 +85,23 @@ const CLASS_BY_TYPE: Partial<Record<SetType, string>> = {
       font-size: 0.85em;
       color: var(--ion-color-medium, #888);
     }
+    .check-btn {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      border: 1px solid var(--ion-color-step-300, #ccc);
+      background: transparent;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--ion-color-medium, #888);
+    }
+    .check-btn.on {
+      background: var(--ion-color-success, #2dd36f);
+      border-color: var(--ion-color-success, #2dd36f);
+      color: #fff;
+    }
+    .check-btn ion-icon { font-size: 1.2rem; }
   `],
   template: `
     <div class="row" [style.grid-template-columns]="gridTemplate()">
@@ -174,6 +193,20 @@ const CLASS_BY_TYPE: Partial<Record<SetType, string>> = {
           (ngModelChange)="patch({ targetRpe: numeric($event) })" />
       }
 
+      <!-- Session-mode check column. Present only when the parent
+           opted in via showCheck. Toggling emits checkChange; the
+           session page mutates set.completed + kicks the rest timer. -->
+      @if (showCheck()) {
+        <button
+          type="button"
+          class="check-btn"
+          [class.on]="!!set().completed"
+          [attr.aria-pressed]="!!set().completed"
+          (click)="checkChange.emit()">
+          <ion-icon name="checkmark-outline" aria-hidden="true" />
+        </button>
+      }
+
     </div>
   `,
 })
@@ -193,12 +226,20 @@ export class SetEditorComponent {
   /** Shown as a grey subtitle on the set-type sheet so the merchant
    *  sees which exercise this row belongs to. */
   readonly exerciseName = input<string>('');
+  /** Session mode — when true, render the check column on the right
+   *  and emit `checkChange` on tap. Off in the routine editor. */
+  readonly showCheck = input<boolean>(false);
   readonly patchSet = output<Partial<RoutineSet>>();
   readonly remove = output<void>();
+  readonly checkChange = output<void>();
 
   private readonly sheets = inject(SelectSheetService);
   private readonly vcr = inject(ViewContainerRef);
   private readonly form = inject(RoutineEditFormService);
+
+  constructor() {
+    addIcons({ 'checkmark-outline': checkmarkOutline });
+  }
 
   protected readonly isBricks = computed(() => this.inputMode() === 'BRICKS');
 
@@ -270,7 +311,8 @@ export class SetEditorComponent {
       : '';
     const duration = (c.duration && !c.reps) ? '1fr' : '';
     const rpe = (this.showRpe() && c.rpe) ? '60px' : '';
-    return [serie, kg, reps, duration, rpe].filter(Boolean).join(' ');
+    const check = this.showCheck() ? '40px' : '';
+    return [serie, kg, reps, duration, rpe, check].filter(Boolean).join(' ');
   });
 
   /** Single-mode reps: mirror into both min and max so the backend keeps
