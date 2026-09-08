@@ -189,11 +189,18 @@ export class RoutineEditPage {
     if (this.confirming) return false;
     this.confirming = true;
     try {
+      const creating = this.isCreate();
       const alert = await this.alerts.create({
-        header: '¿Estás seguro de que quieres descartar todos los cambios de la rutina?',
+        header: creating
+          ? '¿Descartar esta rutina nueva?'
+          : '¿Descartar los cambios de la rutina?',
+        message: creating
+          ? 'Todavía no se guardó — si salís ahora se pierde lo que armaste.'
+          : undefined,
         buttons: [
-          { text: 'Descartar cambios', role: 'destructive' },
-          { text: 'Cancelar',          role: 'cancel'      },
+          { text: creating ? 'Descartar rutina' : 'Descartar cambios',
+            role: 'destructive' },
+          { text: 'Seguir editando', role: 'cancel' },
         ],
       });
       await alert.present();
