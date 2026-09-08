@@ -5,6 +5,15 @@ import { filter, map, startWith } from 'rxjs';
 import { IonNote, IonRouterOutlet } from '@ionic/angular';
 import { NetworkService } from '@core/network/network.service';
 
+/** URL patterns that hide the top notif / chat strip. Any route
+ *  ending in an editor (/edit) is considered immersive. */
+const HIDE_CHROME_RE = /\/edit(\/|$)/;
+
+/** URL patterns that hide the bottom tab bar: routine detail,
+ *  routine editor (create + edit), active workout tracker. Keeps
+ *  the bar visible on the top-level tab index pages only. */
+const HIDE_TABS_RE = /\/(session|routines\/[^/]+)(\/|$)/;
+
 /**
  * Authenticated app shell (3-tab layout, skinless).
  *
@@ -89,15 +98,17 @@ import { NetworkService } from '@core/network/network.service';
       <ion-router-outlet></ion-router-outlet>
     </div>
 
-    <nav aria-label="Navegación principal">
-      <ul>
-        @for (tab of primaryTabs; track tab.path) {
-          <li>
-            <a [routerLink]="tab.path" routerLinkActive="active">{{ tab.label }}</a>
-          </li>
-        }
-      </ul>
-    </nav>
+    @if (showPrimaryNav()) {
+      <nav aria-label="Navegación principal">
+        <ul>
+          @for (tab of primaryTabs; track tab.path) {
+            <li>
+              <a [routerLink]="tab.path" routerLinkActive="active">{{ tab.label }}</a>
+            </li>
+          }
+        </ul>
+      </nav>
+    }
   `,
 })
 export class ShellPage {
@@ -110,8 +121,22 @@ export class ShellPage {
   protected readonly showSecondary = toSignal(
     this.router.events.pipe(
       filter((e): e is NavigationEnd => e instanceof NavigationEnd),
-      map(e => !/\/edit(\/|$)/.test(e.urlAfterRedirects)),
-      startWith(!/\/edit(\/|$)/.test(this.router.url)),
+      map(e => !HIDE_CHROME_RE.test(e.urlAfterRedirects)),
+      startWith(!HIDE_CHROME_RE.test(this.router.url)),
+    ),
+    { initialValue: true },
+  );
+
+  /** Hide the bottom tab bar on nested / immersive pages — routine
+   *  detail, routine editor (create + edit), active session tracker.
+   *  Keeps top-level tabs (home / training list / profile) as the only
+   *  places the tab bar appears, matching the mental model of
+   *  Instagram / Strava. */
+  protected readonly showPrimaryNav = toSignal(
+    this.router.events.pipe(
+      filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+      map(e => !HIDE_TABS_RE.test(e.urlAfterRedirects)),
+      startWith(!HIDE_TABS_RE.test(this.router.url)),
     ),
     { initialValue: true },
   );
