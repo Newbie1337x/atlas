@@ -275,6 +275,29 @@ export class RoutineEditFormService {
     }));
   }
 
+  /**
+   * Mutate a set WITHOUT flipping the dirty flag. Only session mode
+   * uses this — a check-off toggle is workout-only bookkeeping (not
+   * a routine template edit) so it must not prompt "actualizar rutina?"
+   * at Terminar time. Editing a target reps / kg during session still
+   * goes through the plain updateSet (SetEditor's default output) and
+   * DOES flip dirty — that IS a routine change the user might want to
+   * persist to the template.
+   */
+  updateSetSilent(
+    exerciseIndex: number, setIndex: number, patch: Partial<RoutineSet>,
+  ): void {
+    const current = this._draft();
+    if (!current) return;
+    this._draft.set({
+      ...current,
+      exercises: current.exercises.map((ex, i) => i !== exerciseIndex ? ex : {
+        ...ex,
+        sets: ex.sets.map((s, j) => (j === setIndex ? { ...s, ...patch } : s)),
+      }),
+    });
+  }
+
   // ---------- Internals ----------
 
   private patch(fn: (d: RoutineDetail) => RoutineDetail): void {

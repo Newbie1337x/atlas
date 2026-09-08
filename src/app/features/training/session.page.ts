@@ -7,15 +7,17 @@ import { injectQuery, injectQueryClient } from '@tanstack/angular-query-experime
 import {
   IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonContent,
   IonIcon, IonNote, IonSpinner,
-  AlertController, ToastController,
+  AlertController, ModalController, ToastController,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { checkmarkDoneOutline, chevronBackOutline } from 'ionicons/icons';
+import { addOutline, checkmarkDoneOutline, chevronBackOutline } from 'ionicons/icons';
 import { TrainingApi } from '@core/training/training.api';
 import { trainingKeys } from '@core/training/training.keys';
 import { HttpError } from '@core/errors/http-error';
+import { toUpdateRequest } from '@core/training/training-actions.service';
 import { RoutineEditFormService } from './routine-edit/routine-edit-form.service';
 import { ExerciseEditorComponent } from './routine-edit/exercise-editor.component';
+import { ExercisePickerComponent } from './routine-edit/exercise-picker.component';
 import { RestTimerService } from './session/rest-timer.service';
 import { SessionRestTimerComponent } from './session/session-rest-timer.component';
 import { routineDraftToUpsertRequest } from './session/session-to-upsert';
@@ -93,6 +95,11 @@ import { routineDraftToUpsertRequest } from './session/session-to-upsert';
             [showCheck]="true"
             (checkSet)="onCheckSet($index, $event)" />
         }
+
+        <ion-button expand="block" fill="outline" (click)="openPicker()">
+          <ion-icon slot="start" name="add-outline" />
+          Agregar ejercicio
+        </ion-button>
       }
 
       <app-training-session-rest-timer />
@@ -106,6 +113,7 @@ export class SessionPage {
   private readonly queryClient = injectQueryClient();
   private readonly alerts = inject(AlertController);
   private readonly toasts = inject(ToastController);
+  private readonly modal = inject(ModalController);
   private readonly destroyRef = inject(DestroyRef);
   private readonly restTimer = inject(RestTimerService);
   protected readonly form = inject(RoutineEditFormService);
@@ -146,6 +154,7 @@ export class SessionPage {
 
   constructor() {
     addIcons({
+      'add-outline': addOutline,
       'checkmark-done-outline': checkmarkDoneOutline,
       'chevron-back-outline': chevronBackOutline,
     });
@@ -166,17 +175,31 @@ export class SessionPage {
 
   /** ExerciseEditor emits (checkSet)=setIndex when the shared SetEditor's
    *  check column is tapped. Toggle the flag on the underlying set and
-   *  kick the rest timer if we just marked it done. */
+   *  kick the rest timer if we just marked it done. Uses updateSetSilent
+   *  so a check-off doesn't count as a routine edit — the "actualizar
+   *  rutina?" prompt at Terminar only fires when the user changed
+   *  targets / added sets / etc, not for pure completion tracking. */
   protected onCheckSet(exerciseIndex: number, setIndex: number): void {
     const set = this.form.draft()?.exercises[exerciseIndex]?.sets[setIndex];
     if (!set) return;
     const wasCompleted = !!set.completed;
-    this.form.updateSet(exerciseIndex, setIndex, { completed: !wasCompleted });
+    this.form.updateSetSilent(exerciseIndex, setIndex, { completed: !wasCompleted });
     if (!wasCompleted) {
       const exercise = this.form.draft()?.exercises[exerciseIndex];
       const rest = set.restSecondsAfter ?? exercise?.restSeconds ?? 0;
       if (rest > 0) this.restTimer.start(rest);
     }
+  }
+
+  /** Same picker + form.addExercise path the routine editor uses.
+   *  Since we share RoutineEditFormService, the newly added exercise
+   *  lands in the session draft and is trackable immediately. Marks
+   *  dirty → Terminar will offer "actualizar rutina?". */
+  protected async openPicker(): Promise<void> {
+    const modal = await this.modal.create({ component: ExercisePickerComponent });
+    await modal.present();
+    const { data } = await modal.onDidDismiss();
+    if (data) this.form.addExercise(data.id, data.name, data.demoMediaUrl, data.capabilities);
   }
 
   protected elapsedMmss(): string {
@@ -226,21 +249,39 @@ export class SessionPage {
   protected async confirmTerminar(): Promise<void> {
     const draft = this.form.draft();
     if (!draft) return;
+    const hasRoutineChanges = this.form.dirty() && draft.id > 0;
+    const countsMsg = `${this.completedCount()} de ${this.totalCount()} series marcadas.`;
+
+    // Three-option alert when the user modified targets / added sets /
+    // added an exercise etc: they choose to persist those changes to
+    // the routine template or discard them (workout gets saved either way).
+    // Buttons carry `data` — Ionic threads it through onDidDismiss.
     const alert = await this.alerts.create({
       header: '¿Terminar entrenamiento?',
-      message: `${this.completedCount()} de ${this.totalCount()} series marcadas.`,
-      buttons: [
-        { text: 'Seguir entrenando', role: 'cancel' },
-        { text: 'Terminar', role: 'confirm' },
-      ],
+      message: hasRoutineChanges
+        ? `${countsMsg} Hiciste cambios en la rutina — ¿los guardas en el template?`
+        : countsMsg,
+      buttons: hasRoutineChanges
+        ? [
+            { text: 'Cancelar', role: 'cancel' },
+            { text: 'Descartar cambios', role: 'terminate' },
+            { text: 'Actualizar rutina', role: 'update' },
+          ]
+        : [
+            { text: 'Seguir entrenando', role: 'cancel' },
+            { text: 'Terminar', role: 'terminate' },
+          ],
     });
     await alert.present();
     const { role } = await alert.onDidDismiss();
-    if (role !== 'confirm') return;
-    await this.finalize();
+    if (role === 'cancel' || role === 'backdrop') return;
+    await this.finalize(role === 'update');
   }
 
-  private async finalize(): Promise<void> {
+  /** Always PUT /workouts + POST /complete. If `updateRoutine` was
+   *  picked, also PUT /routines with the (edited) draft so the template
+   *  reflects what the user actually wants going forward. */
+  private async finalize(updateRoutine: boolean): Promise<void> {
     const draft = this.form.draft();
     if (!draft) return;
     this.saving.set(true);
@@ -248,6 +289,10 @@ export class SessionPage {
       const body = routineDraftToUpsertRequest(draft, this.startedAt.toISOString());
       await firstValueFrom(this.api.upsertWorkout(this.clientUuid, body));
       await firstValueFrom(this.api.completeWorkout(this.clientUuid));
+      if (updateRoutine && draft.id > 0) {
+        await firstValueFrom(
+          this.api.updateRoutine(draft.id, toUpdateRequest(draft)));
+      }
       await this.queryClient.invalidateQueries({ queryKey: trainingKeys.all });
       this.form.markPristine();
       this.router.navigate(['/training/routines', draft.id]);
