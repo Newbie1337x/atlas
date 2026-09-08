@@ -57,25 +57,25 @@ import { ExercisePickerComponent } from './routine-edit/exercise-picker.componen
       flex-direction: column;
       align-items: center;
       text-align: center;
-      padding: 48px 24px 24px;
+      padding: 32px 24px 16px;
       color: var(--ion-color-medium, #666);
     }
     .empty-state ion-icon {
-      font-size: 3.5rem;
+      font-size: 2.25rem;
       color: var(--ion-color-step-300, #ccc);
-      margin-bottom: 16px;
+      margin-bottom: 10px;
     }
     .empty-state h3 {
-      margin: 0 0 8px;
+      margin: 0 0 6px;
       color: var(--ion-text-color, #333);
-      font-size: 1.05rem;
+      font-size: 0.95rem;
       font-weight: 600;
     }
     .empty-state p {
-      margin: 0 0 20px;
-      font-size: 0.9rem;
-      max-width: 260px;
-      line-height: 1.4;
+      margin: 0 0 14px;
+      font-size: 0.8rem;
+      max-width: 240px;
+      line-height: 1.35;
     }
   `],
   template: `
@@ -121,7 +121,7 @@ import { ExercisePickerComponent } from './routine-edit/exercise-picker.componen
               Agrega ejercicios de la biblioteca para armar tu rutina.
               Puedes reordenarlos y agruparlos en superseries después.
             </p>
-            <ion-button (click)="openPicker()">
+            <ion-button size="default" (click)="openPicker()">
               <ion-icon slot="start" name="add-outline" />
               Agregar ejercicio
             </ion-button>
