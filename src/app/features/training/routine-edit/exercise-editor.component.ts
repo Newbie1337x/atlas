@@ -52,46 +52,9 @@ import { ExercisePickerComponent } from './exercise-picker.component';
     IonButton, IonIcon, IonTextarea,
     SetEditorComponent, ExerciseIconComponent, RestPickerComponent,
   ],
-  styles: [`
-    .header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .header ion-card-title {
-      flex: 1;
-      font-size: 1rem;
-    }
-    .header-legend {
-      display: grid;
-      gap: 4px;
-      padding: 4px 8px;
-      font-size: 0.75em;
-      color: var(--ion-color-medium, #666);
-      text-transform: uppercase;
-      text-align: center;
-    }
-    .reps-header, .weight-header {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 4px;
-      cursor: pointer;
-      color: var(--ion-color-primary, #3880ff);
-    }
-    .reps-header ion-icon, .weight-header ion-icon { font-size: 0.85em; }
-    .notes-input {
-      --padding-start: 0;
-      --padding-end: 0;
-      --padding-top: 2px;
-      --padding-bottom: 6px;
-      --placeholder-color: var(--ion-color-medium, #888);
-      --placeholder-opacity: 1;
-      font-size: 0.9rem;
-    }
-  `],
+  styleUrl: './exercise-editor.component.css',
   template: `
-    <ion-card>
+    <ion-card [class.superset]="!!supersetLetter()">
       <ion-card-header>
         <!-- Header doubles as long-press target for the actions menu.
              Interactive children (the ⋮ button) still get their own tap
@@ -106,6 +69,9 @@ import { ExercisePickerComponent } from './exercise-picker.component';
           (pointermove)="onHeaderPointerMove($event)">
           <app-training-exercise-icon [name]="exercise().exerciseName" size="small" />
           <ion-card-title>
+            @if (supersetLetter(); as letter) {
+              <span class="superset-badge" [attr.aria-label]="'Superserie ' + letter">{{ letter }}</span>
+            }
             {{ (index() + 1) + '. ' + (exercise().exerciseName ?? 'Ejercicio #' + exercise().exerciseId) }}
           </ion-card-title>
           <ion-button fill="clear" size="small" (click)="openMenu()" aria-label="Opciones del ejercicio">
@@ -218,6 +184,22 @@ export class ExerciseEditorComponent {
   /** Server-computed input matrix for this exercise; falls back permissive. */
   protected readonly caps = computed<ExerciseCapabilities>(() =>
     this.exercise().capabilities ?? PERMISSIVE_CAPS);
+
+  /** Letter for the superset badge (A/B/C…). Derived from first-appearance
+   *  order of the unique supersetGroupIds in the draft, so groups are
+   *  labeled consistently across every exercise editor. Null when this
+   *  exercise is not in a group. */
+  protected readonly supersetLetter = computed<string | null>(() => {
+    const id = this.exercise().supersetGroupId;
+    if (!id) return null;
+    const seen: string[] = [];
+    for (const ex of this.form.draft()?.exercises ?? []) {
+      const g = ex.supersetGroupId;
+      if (g && !seen.includes(g)) seen.push(g);
+    }
+    const idx = seen.indexOf(id);
+    return idx >= 0 && idx < 26 ? String.fromCharCode(65 + idx) : '★';
+  });
 
   /** Empty-string fallback of the exercise name, used as the subtitle
    *  on every sheet + passed down to set-editor. Avoids sprinkling
@@ -337,8 +319,8 @@ export class ExerciseEditorComponent {
           leadingIcon: 'reorder-three-outline' },
         { label: 'Reemplazar ejercicio',     value: 'replace',
           leadingIcon: 'swap-horizontal-outline' },
-        { label: 'Agregar a superserie',     value: 'superset',
-          leadingIcon: 'link-outline' },
+        { label: this.supersetLetter() ? 'Quitar de superserie' : 'Agregar a superserie',
+          value: 'superset', leadingIcon: 'link-outline' },
         { label: 'Eliminar ejercicio',       value: 'delete',
           leadingIcon: 'trash-outline', destructive: true },
       ],
@@ -348,7 +330,10 @@ export class ExerciseEditorComponent {
       case 'rpe':      this.toggleRpe(); break;
       case 'reorder':  this.openReorder(); break;
       case 'replace':  this.openReplace(); break;
-      case 'superset': this.actions.notImplemented('Superserie'); break;
+      case 'superset':
+        if (this.supersetLetter()) this.form.removeFromSuperset(this.index());
+        else this.openSupersetPicker();
+        break;
       case 'delete':   this.confirmDelete(); break;
     }
   }
@@ -421,6 +406,34 @@ export class ExerciseEditorComponent {
       },
     });
     await modal.present();
+  }
+
+  /** Sheet listing every OTHER exercise in the routine — pick one and
+   *  both join the same supersetGroupId (see form.addToSuperset for
+   *  merge rules). Never opens if this is the only exercise. */
+  private async openSupersetPicker(): Promise<void> {
+    const all = this.form.draft()?.exercises ?? [];
+    const currentIdx = this.index();
+    const options = all
+      .map((ex, i) => ({ ex, i }))
+      .filter(({ i }) => i !== currentIdx)
+      .map(({ ex, i }) => ({
+        label: ex.exerciseName ?? `Ejercicio #${ex.exerciseId}`,
+        value: String(i),
+        leadingIcon: 'link-outline',
+      }));
+    if (!options.length) {
+      this.actions.notImplemented('Necesitás otro ejercicio para armar la superserie');
+      return;
+    }
+    const picked = await this.selectSheet.open(this.vcr, {
+      header: 'Agregar a superserie',
+      subtitle: this.exerciseName(),
+      value: '',
+      options,
+    });
+    if (!picked) return;
+    this.form.addToSuperset(currentIdx, Number(picked));
   }
 
   /** Opens the exercise picker (same modal as "Agregar ejercicio") in

@@ -1,0 +1,58 @@
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.header ion-card-title {
+  flex: 1;
+  font-size: 1rem;
+}
+.header-legend {
+  display: grid;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 0.75em;
+  color: var(--ion-color-medium, #666);
+  text-transform: uppercase;
+  text-align: center;
+}
+.reps-header, .weight-header {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  color: var(--ion-color-primary, #3880ff);
+}
+.reps-header ion-icon, .weight-header ion-icon { font-size: 0.85em; }
+.notes-input {
+  --padding-start: 0;
+  --padding-end: 0;
+  --padding-top: 2px;
+  --padding-bottom: 6px;
+  --placeholder-color: var(--ion-color-medium, #888);
+  --placeholder-opacity: 1;
+  font-size: 0.9rem;
+}
+
+/* --- Superset --- */
+/* Colored left border marks the whole group visually; letter badge
+ * next to the title differentiates groups A/B/C when there are more
+ * than one in the same routine. */
+ion-card.superset {
+  border-left: 3px solid var(--ion-color-primary, #3880ff);
+}
+.superset-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 6px;
+  border-radius: 4px;
+  background: var(--ion-color-primary, #3880ff);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  vertical-align: middle;
+}

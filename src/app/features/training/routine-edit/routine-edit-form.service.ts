@@ -171,6 +171,59 @@ export class RoutineEditFormService {
     }));
   }
 
+  /**
+   * Join `partnerIndex` into `currentIndex`'s superset group. Rules:
+   * - If current already has a groupId, partner joins it (any group
+   *   partner might have been in is left behind).
+   * - Else if partner has one, current joins partner's.
+   * - Else a fresh UUID is minted and both get it.
+   * Never merges two existing groups by design — we always drive from
+   * the exercise whose ⋮ opened the picker.
+   */
+  addToSuperset(currentIndex: number, partnerIndex: number): void {
+    if (currentIndex === partnerIndex) return;
+    this.patch(d => {
+      const current = d.exercises[currentIndex];
+      const partner = d.exercises[partnerIndex];
+      if (!current || !partner) return d;
+      const groupId =
+        current.supersetGroupId ?? partner.supersetGroupId ?? crypto.randomUUID();
+      return {
+        ...d,
+        exercises: d.exercises.map((ex, i) =>
+          i === currentIndex || i === partnerIndex
+            ? { ...ex, supersetGroupId: groupId }
+            : ex),
+      };
+    });
+  }
+
+  /**
+   * Ungroup one exercise. If removing this leaves the group with a
+   * single member, that lone survivor is ungrouped too — a superset
+   * of one is not a superset.
+   */
+  removeFromSuperset(exerciseIndex: number): void {
+    this.patch(d => {
+      const target = d.exercises[exerciseIndex];
+      const groupId = target?.supersetGroupId;
+      if (!groupId) return d;
+      const remainingCount = d.exercises.filter(
+        (ex, i) => i !== exerciseIndex && ex.supersetGroupId === groupId).length;
+      const collapseLoner = remainingCount === 1;
+      return {
+        ...d,
+        exercises: d.exercises.map((ex, i) => {
+          if (i === exerciseIndex) return { ...ex, supersetGroupId: null };
+          if (collapseLoner && ex.supersetGroupId === groupId) {
+            return { ...ex, supersetGroupId: null };
+          }
+          return ex;
+        }),
+      };
+    });
+  }
+
   moveExercise(from: number, to: number): void {
     if (from === to) return;
     this.patch(d => {
