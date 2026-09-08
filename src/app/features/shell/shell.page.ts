@@ -14,6 +14,11 @@ const HIDE_CHROME_RE = /\/edit(\/|$)/;
  *  the bar visible on the top-level tab index pages only. */
 const HIDE_TABS_RE = /\/(session|routines\/[^/]+)(\/|$)/;
 
+/** Exact URLs of the top-level tab pages. Back gesture on any of
+ *  these should be trapped (see tab-guard trick below) so the user
+ *  cannot fall off the app by hammering back on Inicio. */
+const TOP_LEVEL_TAB_RE = /^\/(home|training|profile)\/?(\?|$)/;
+
 /**
  * Authenticated app shell (3-tab layout, skinless).
  *
@@ -151,4 +156,44 @@ export class ShellPage {
     { path: '/training', label: 'Entrenamiento'  },
     { path: '/profile',  label: 'Perfil'         },
   ];
+
+  constructor() {
+    this.installBackGestureTrap();
+  }
+
+  /**
+   * Trap the browser back gesture on top-level tab pages so the user
+   * cannot "fall off" the app by pressing back on Inicio / Entrenamiento
+   * / Perfil.
+   *
+   * How: after every NavigationEnd that lands on a top-level tab, push
+   * a sentinel history entry that carries `{ tabGuard: true }`. When
+   * the user presses back, the sentinel is popped — URL stays put
+   * (pushState('') preserves URL). A popstate listener notices the
+   * guard is gone and pushes a fresh one, effectively looping the user
+   * back onto the tab.
+   *
+   * Coexists with the modal history trick (RestPicker / ReorderModal /
+   * ExercisePicker each push their own state on open, pop on close):
+   * modal popstate handlers run first, dismiss the modal, then Router
+   * settles at the top-level tab and we re-push. Native Capacitor back
+   * will replace this via App.backButton — noted in
+   * gym-sheet-back-gesture-capacitor.
+   */
+  private installBackGestureTrap(): void {
+    const guardIfTop = () => {
+      if (
+        TOP_LEVEL_TAB_RE.test(this.router.url) &&
+        (window.history.state as { tabGuard?: boolean } | null)?.tabGuard !== true
+      ) {
+        history.pushState({ tabGuard: true }, '');
+      }
+    };
+    this.router.events
+      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
+      .subscribe(guardIfTop);
+    // microtask defers past any modal popstate handler that also ran on
+    // this event, so we do not re-push while a modal is dismissing.
+    window.addEventListener('popstate', () => queueMicrotask(guardIfTop));
+  }
 }
