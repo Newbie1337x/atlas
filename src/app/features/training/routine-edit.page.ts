@@ -6,10 +6,11 @@ import { injectQuery, injectQueryClient } from '@tanstack/angular-query-experime
 import {
   IonHeader, IonToolbar, IonTitle, IonButtons, IonButton,
   IonContent, IonInput, IonNote, IonSpinner, IonIcon,
-  AlertController, ModalController,
+  AlertController, ModalController, ToastController,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { addOutline, checkmarkOutline, chevronBackOutline } from 'ionicons/icons';
+import { addOutline, barbellOutline, checkmarkOutline, chevronBackOutline } from 'ionicons/icons';
+import { HttpError } from '@core/errors/http-error';
 import { TrainingApi } from '@core/training/training.api';
 import { trainingKeys } from '@core/training/training.keys';
 import { toUpdateRequest } from '@core/training/training-actions.service';
@@ -51,6 +52,31 @@ import { ExercisePickerComponent } from './routine-edit/exercise-picker.componen
       font-size: 1.25rem;
       font-weight: 600;
     }
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 48px 24px 24px;
+      color: var(--ion-color-medium, #666);
+    }
+    .empty-state ion-icon {
+      font-size: 3.5rem;
+      color: var(--ion-color-step-300, #ccc);
+      margin-bottom: 16px;
+    }
+    .empty-state h3 {
+      margin: 0 0 8px;
+      color: var(--ion-text-color, #333);
+      font-size: 1.05rem;
+      font-weight: 600;
+    }
+    .empty-state p {
+      margin: 0 0 20px;
+      font-size: 0.9rem;
+      max-width: 260px;
+      line-height: 1.4;
+    }
   `],
   template: `
     <ion-header>
@@ -87,14 +113,29 @@ import { ExercisePickerComponent } from './routine-edit/exercise-picker.componen
           [ngModel]="d.title"
           (ngModelChange)="form.updateTitle($event)" />
 
-        @for (ex of d.exercises; track $index) {
-          <app-training-exercise-editor [exercise]="ex" [index]="$index" />
-        }
+        @if (d.exercises.length === 0) {
+          <div class="empty-state">
+            <ion-icon name="barbell-outline" aria-hidden="true" />
+            <h3>Empieza con tu primer ejercicio</h3>
+            <p>
+              Agrega ejercicios de la biblioteca para armar tu rutina.
+              Puedes reordenarlos y agruparlos en superseries después.
+            </p>
+            <ion-button (click)="openPicker()">
+              <ion-icon slot="start" name="add-outline" />
+              Agregar ejercicio
+            </ion-button>
+          </div>
+        } @else {
+          @for (ex of d.exercises; track $index) {
+            <app-training-exercise-editor [exercise]="ex" [index]="$index" />
+          }
 
-        <ion-button expand="block" fill="outline" (click)="openPicker()">
-          <ion-icon slot="start" name="add-outline" />
-          Agregar ejercicio
-        </ion-button>
+          <ion-button expand="block" fill="outline" (click)="openPicker()">
+            <ion-icon slot="start" name="add-outline" />
+            Agregar ejercicio
+          </ion-button>
+        }
       }
     </ion-content>
   `,
@@ -106,6 +147,7 @@ export class RoutineEditPage {
   private readonly queryClient = injectQueryClient();
   private readonly modal = inject(ModalController);
   private readonly alerts = inject(AlertController);
+  private readonly toasts = inject(ToastController);
   protected readonly form = inject(RoutineEditFormService);
 
   protected readonly saving = signal(false);
@@ -144,6 +186,7 @@ export class RoutineEditPage {
   constructor() {
     addIcons({
       'add-outline': addOutline,
+      'barbell-outline': barbellOutline,
       'checkmark-outline': checkmarkOutline,
       'chevron-back-outline': chevronBackOutline,
     });
@@ -242,6 +285,21 @@ export class RoutineEditPage {
       // prompt "descartar cambios?" over a just-saved routine.
       this.form.markPristine();
       this.router.navigate(['/training/routines', saved.id]);
+    } catch (err) {
+      // Draft stays intact so the user can retry without losing what
+      // they built. HttpError carries a Spanish userMessage (mapped by
+      // http-error.ts); anything else falls back to a generic string.
+      const message = err instanceof HttpError
+        ? err.userMessage
+        : 'No pudimos guardar los cambios.';
+      const toast = await this.toasts.create({
+        message,
+        duration: 4000,
+        color: 'danger',
+        position: 'bottom',
+        buttons: [{ text: 'OK', role: 'cancel' }],
+      });
+      await toast.present();
     } finally {
       this.saving.set(false);
     }
