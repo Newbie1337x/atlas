@@ -10,6 +10,7 @@ import { RoutineFolder, RoutineFolderRequest } from './folder.model';
 import {
   CreateRoutineRequest, RoutineDetail, RoutineSummary, UpdateRoutineRequest,
 } from './routine.model';
+import { UpsertWorkoutRequest, WorkoutDetail } from './workout.model';
 
 /**
  * HTTP endpoints for the TRAINING module — routines + folders that the
@@ -123,5 +124,26 @@ export class TrainingApi {
   ): Observable<ExerciseInputPreference> {
     return this.http.put<ExerciseInputPreference>(
       `${this.baseUrl}/api/training/exercises/${exerciseId}/input-preference/me`, body);
+  }
+
+  // --- Workout tracker (active session) ---
+  // Idempotent upsert keyed by client-minted UUID — safe to retry after
+  // offline drops, tab kills, or double-taps. Full progress lives in the
+  // payload; server owns startedAt as the source of truth and infers
+  // globalProfileId from the JWT.
+
+  upsertWorkout(clientUuid: string, body: UpsertWorkoutRequest): Observable<WorkoutDetail> {
+    return this.http.put<WorkoutDetail>(
+      `${this.baseUrl}/api/training/workouts/${clientUuid}`, body);
+  }
+
+  completeWorkout(id: string): Observable<void> {
+    return this.http.post<void>(
+      `${this.baseUrl}/api/training/workouts/${id}/complete`, {});
+  }
+
+  discardWorkout(id: string): Observable<void> {
+    return this.http.post<void>(
+      `${this.baseUrl}/api/training/workouts/${id}/discard`, {});
   }
 }

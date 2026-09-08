@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { routineEditDeactivateGuard } from './routine-edit/routine-edit-deactivate.guard';
+import { sessionDeactivateGuard } from './session/session-deactivate.guard';
 
 /**
  * Training tab — routines list + active workout tracker + community
@@ -15,7 +16,11 @@ import { routineEditDeactivateGuard } from './routine-edit/routine-edit-deactiva
 export const trainingRoutes: Routes = [
   { path: '',                  loadComponent: () => import('./training.page').then((m) => m.TrainingPage) },
   { path: 'explore',           loadComponent: () => import('./explore.page').then((m) => m.ExplorePage) },
-  { path: 'session',           loadComponent: () => import('./session.page').then((m) => m.SessionPage) },
+  {
+    path: 'session/:routineId',
+    loadComponent: () => import('./session.page').then((m) => m.SessionPage),
+    canDeactivate: [sessionDeactivateGuard],
+  },
   { path: 'routines/:id',      loadComponent: () => import('./routine-detail.page').then((m) => m.RoutineDetailPage) },
   {
     // "new" is a reserved id — the editor treats it as create mode:

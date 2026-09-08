@@ -75,8 +75,7 @@ import { RoutineExerciseListComponent } from './routine-detail/routine-exercise-
         }
         <ion-button
           expand="block"
-          [routerLink]="['/training/session']"
-          [queryParams]="{ routineId: r.id }">
+          [routerLink]="['/training/session', r.id]">
           Empezar rutina
         </ion-button>
 

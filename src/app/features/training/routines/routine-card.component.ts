@@ -7,7 +7,7 @@ import { IonItem, IonLabel, IonNote, IonButton, IonIcon } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import {
   ellipsisVertical, shareSocialOutline, copyOutline,
-  createOutline, trashOutline,
+  createOutline, trashOutline, playCircleOutline,
 } from 'ionicons/icons';
 import { RoutineSummary } from '@core/training/routine.model';
 import { TrainingActionsService } from '@core/training/training-actions.service';
@@ -75,6 +75,7 @@ export class RoutineCardComponent {
       'copy-outline': copyOutline,
       'create-outline': createOutline,
       'trash-outline': trashOutline,
+      'play-circle-outline': playCircleOutline,
     });
   }
 
@@ -92,6 +93,8 @@ export class RoutineCardComponent {
       subtitle: r.title,
       value: '',
       options: [
+        { label: 'Empezar rutina',   value: 'start',
+          leadingIcon: 'play-circle-outline' },
         { label: 'Compartir rutina', value: 'share',
           leadingIcon: 'share-social-outline' },
         { label: 'Duplicar rutina',  value: 'duplicate',
@@ -103,6 +106,7 @@ export class RoutineCardComponent {
       ],
     });
     switch (picked) {
+      case 'start':     this.router.navigate(['/training/session', r.id]); break;
       case 'share':     this.actions.notImplemented('Compartir'); break;
       case 'duplicate': this.actions.confirmCloneRoutine(r); break;
       case 'edit':      this.router.navigate(['/training/routines', r.id, 'edit']); break;
