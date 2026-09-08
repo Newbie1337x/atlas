@@ -10,14 +10,12 @@ import {
   ExerciseCapabilities, PERMISSIVE_CAPS, RepsMode, RoutineSet, SetType,
 } from '@core/training/routine.model';
 import { InputMode } from '@core/training/exercise.model';
+import { PreviousSet } from '@core/training/workout-prepare.model';
+import { formatPreviousLabel } from '../session/previous-set-label';
 import { SelectSheetService, SelectSheetOption } from '@shared/ui/select-sheet.service';
 import { RoutineEditFormService } from './routine-edit-form.service';
 
-/** Wildly permissive default when the parent has not yet resolved the
- *  exercise's capabilities from the backend (older routines missing the
- *  computed field). Prefer showing every input over silently hiding one. */
-/** Glyph shown in the row for special set types; WORKING falls through
- *  to the numeric ordinal computed by the parent. */
+/** Glyph shown for special set types; WORKING → numeric ordinal. */
 const GLYPH_BY_TYPE: Partial<Record<SetType, string>> = {
   WARMUP: 'W', DROP_SET: 'D', FAILURE: 'F',
 };
@@ -25,25 +23,10 @@ const CLASS_BY_TYPE: Partial<Record<SetType, string>> = {
   WARMUP: 'warmup', DROP_SET: 'drop', FAILURE: 'failure',
 };
 
-/**
- * One set row. Column order matches Hevy: Serie | Kg | Reps | [RPE] | (×).
- *
- * Serie:
- *   - WORKING rows display the set number (index + 1).
- *   - WARMUP / DROP / FAILURE show W / D / F.
- *   Numbering is a plain index+1 for the MVP — a future refinement is to
- *   number only among WORKING sets so a warmup as row 0 does not push
- *   the working numbers up.
- *
- * Reps:
- *   Lives in a single grid cell. In range mode it renders two inputs
- *   with an "a" separator so 8 a 12 reads inline; in single mode it is
- *   just one input, and typing there mirrors into both min and max on
- *   write so the backend keeps consistent "N reps" values.
- *
- * Duration + distance columns are omitted from this compact row — they
- * apply to cardio / timed sets which the MVP does not surface.
- */
+/** One set row. Column order matches Hevy: Serie | [Anterior] | Kg |
+ *  Reps | [Tiempo] | [RPE] | [Check]. Anterior + Check appear only in
+ *  session mode (showCheck). Reps single-mode mirrors min===max on
+ *  write so the backend keeps a consistent "N reps" value. */
 @Component({
   selector: 'app-training-set-editor',
   standalone: true,
@@ -53,64 +36,22 @@ const CLASS_BY_TYPE: Partial<Record<SetType, string>> = {
     IonInput, IonButton, IonIcon,
   ],
   styles: [`
-    .row {
-      display: grid;
-      align-items: center;
-      gap: 4px;
-      padding: 4px 8px;
-    }
-    .row ion-input {
-      --padding-start: 6px; --padding-end: 6px;
-      font-size: 0.9em;
-      text-align: center;
-    }
-    .serie {
-      --padding-start: 0; --padding-end: 0;
-      --padding-top: 0; --padding-bottom: 0;
-      min-height: 32px;
-      font-size: 0.95em;
-      font-weight: 600;
-      margin: 0;
-    }
+    .row { display: grid; align-items: center; gap: 4px; padding: 4px 8px; }
+    .row ion-input { --padding-start: 6px; --padding-end: 6px; font-size: 0.9em; text-align: center; }
+    .serie { --padding-start: 0; --padding-end: 0; --padding-top: 0; --padding-bottom: 0; min-height: 32px; font-size: 0.95em; font-weight: 600; margin: 0; }
     .serie.warmup  { color: var(--ion-color-warning, #f0ad4e); }
     .serie.drop    { color: var(--ion-color-primary, #3880ff); }
     .serie.failure { color: var(--ion-color-danger,  #eb445a); }
-    .reps-range {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
+    .reps-range { display: flex; align-items: center; gap: 4px; }
     .reps-range ion-input { flex: 1; }
-    .reps-sep {
-      font-size: 0.85em;
-      color: var(--ion-color-medium, #888);
-    }
-    .check-btn {
-      width: 32px; height: 32px;
-      border-radius: 8px;
-      border: 1px solid var(--ion-color-step-300, #ccc);
-      background: transparent;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      color: var(--ion-color-medium, #888);
-    }
-    .check-btn.on {
-      background: var(--ion-color-success, #2dd36f);
-      border-color: var(--ion-color-success, #2dd36f);
-      color: #fff;
-    }
+    .reps-sep { font-size: 0.85em; color: var(--ion-color-medium, #888); }
+    .check-btn { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--ion-color-step-300, #ccc); background: transparent; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--ion-color-medium, #888); }
+    .check-btn.on { background: var(--ion-color-success, #2dd36f); border-color: var(--ion-color-success, #2dd36f); color: #fff; }
     .check-btn ion-icon { font-size: 1.2rem; }
-    .check-cell {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .pr-badge {
-      font-size: 1rem;
-      line-height: 1;
-    }
+    .check-cell { display: inline-flex; align-items: center; gap: 4px; }
+    .pr-badge { font-size: 1rem; line-height: 1; }
+    .anterior { font-size: 0.85em; color: var(--ion-color-medium, #888); text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .anterior.empty { opacity: 0.4; }
   `],
   template: `
     <div class="row" [style.grid-template-columns]="gridTemplate()">
@@ -126,6 +67,11 @@ const CLASS_BY_TYPE: Partial<Record<SetType, string>> = {
         aria-label="Tipo de serie">
         {{ selectedTypeGlyph() }}
       </ion-button>
+
+      <!-- ANTERIOR (session only): last workout's matching row. -->
+      @if (showCheck()) {
+        <span class="anterior" [class.empty]="!previousLabel()">{{ previousLabel() || '—' }}</span>
+      }
 
       <!-- Kg / Ladrillos — hidden entirely when the exercise doesn't support
            weight. Session mode binds to actualWeightKg (workout log) with
@@ -258,6 +204,8 @@ export class SetEditorComponent {
   /** Session-only: when true, render a 🏆 badge next to the check —
    *  the set's actuals beat this exercise's current PR client-side. */
   readonly isPr = input<boolean>(false);
+  /** Session-only ANTERIOR ghost — matching row from the last workout. */
+  readonly previousSet = input<PreviousSet | null>(null);
   readonly patchSet = output<Partial<RoutineSet>>();
   readonly remove = output<void>();
   readonly checkChange = output<void>();
@@ -355,14 +303,12 @@ export class SetEditorComponent {
     return options;
   });
 
-  /** Column layout: Serie | [Kg] | [Reps] | [Tiempo] | [RPE]. Any
-   *  middle column collapses out of the grid when caps say the
-   *  exercise doesn't use that metric. Tiempo only shows when the
-   *  exercise supports duration AND reps isn't its primary metric
-   *  (isometric holds — plank, l-sit, wall sit). */
+  /** Middle cols collapse when caps disable them. Session mode adds
+   *  ANTERIOR (before Kg) and CHECK (last). */
   protected readonly gridTemplate = computed(() => {
     const c = this.caps();
     const serie = '48px';
+    const anterior = this.showCheck() ? '1.2fr' : '';
     const kg = c.weight ? '1fr' : '';
     const reps = c.reps
       ? (this.repsMode() === 'RANGE' ? '1.4fr' : '1fr')
@@ -370,8 +316,12 @@ export class SetEditorComponent {
     const duration = (c.duration && !c.reps) ? '1fr' : '';
     const rpe = (this.showRpe() && c.rpe) ? '60px' : '';
     const check = this.showCheck() ? '40px' : '';
-    return [serie, kg, reps, duration, rpe, check].filter(Boolean).join(' ');
+    return [serie, anterior, kg, reps, duration, rpe, check]
+      .filter(Boolean).join(' ');
   });
+
+  protected readonly previousLabel = computed<string>(() =>
+    formatPreviousLabel(this.previousSet(), this.isBricks(), this.brickWeightKg()));
 
   /** Single-mode reps: mirror into both min and max so the backend keeps
    *  a consistent "N reps" value (not min:N max:null). */
@@ -415,19 +365,9 @@ export class SetEditorComponent {
     this.patch({ setType: picked as SetType });
   }
 
-  /**
-   * The saved reference value for a named field — from the last time
-   * the routine was loaded from the backend (see
-   * RoutineEditFormService.originalSetById). Independent of what the
-   * user has been typing this session: even after edit + delete cycles,
-   * this stays as the "what was there when I opened this routine"
-   * anchor. Refreshes only on Save + refetch. New sets (id = 0) have
-   * no snapshot → returns empty and the placeholder falls back to the
-   * unit hint.
-   *
-   * Bricks mode: convert the kg snapshot into bricks so the displayed
-   * placeholder matches the input's own unit.
-   */
+  /** Last-loaded snapshot value for a field — the "what was there when
+   *  I opened this routine" anchor for the placeholder. Refreshes only
+   *  on Save + refetch. Bricks mode: kg snapshot / brickWeight. */
   private savedFor(name: string): string {
     const original = this.form.originalSetById(this.set().id);
     if (!original) return '';

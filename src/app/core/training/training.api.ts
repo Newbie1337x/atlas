@@ -12,6 +12,7 @@ import {
 } from './routine.model';
 import { UpsertWorkoutRequest, WorkoutDetail } from './workout.model';
 import { PersonalRecord } from './personal-record.model';
+import { WorkoutPrepare } from './workout-prepare.model';
 
 /**
  * HTTP endpoints for the TRAINING module — routines + folders that the
@@ -146,6 +147,15 @@ export class TrainingApi {
   discardWorkout(id: string): Observable<void> {
     return this.http.post<void>(
       `${this.baseUrl}/api/training/workouts/${id}/discard`, {});
+  }
+
+  /** Consolidated session-start fetch: routine detail + PRs + ANTERIOR
+   *  ghost values in one round-trip. Session page uses this in place of
+   *  GET /routines/:id + GET /personal-records/batch. */
+  prepareWorkout(routineId: number): Observable<WorkoutPrepare> {
+    const params = new HttpParams().set('routineId', routineId);
+    return this.http.get<WorkoutPrepare>(
+      `${this.baseUrl}/api/training/workouts/prepare`, { params });
   }
 
   // --- Personal records ---

@@ -17,6 +17,7 @@ import { HttpError } from '@core/errors/http-error';
 import { toUpdateRequest } from '@core/training/training-actions.service';
 import { uuidV4 } from '@core/uuid';
 import { PersonalRecord } from '@core/training/personal-record.model';
+import { PreviousSet } from '@core/training/workout-prepare.model';
 import { RoutineEditFormService } from './routine-edit/routine-edit-form.service';
 import { ExerciseEditorComponent } from './routine-edit/exercise-editor.component';
 import { ExercisePickerComponent } from './routine-edit/exercise-picker.component';
@@ -96,6 +97,7 @@ import { routineDraftToUpsertRequest } from './session/session-to-upsert';
             [index]="$index"
             [showCheck]="true"
             [personalRecords]="prsFor(ex.exerciseId)"
+            [previousSets]="previousFor(ex.exerciseId)"
             (checkSet)="onCheckSet($index, $event)" />
         }
 
@@ -138,31 +140,22 @@ export class SessionPage {
     return raw ? Number(raw) : NaN;
   });
 
+  /** ONE call at session start: routine detail + PRs + ANTERIOR ghost
+   *  values. Backing GET /workouts/prepare. Backed by the shared
+   *  routineDetail queryKey so returning to /training/routines/:id
+   *  after the workout uses the just-fetched routine payload from
+   *  inside `data.routine` — no separate refetch needed. */
   protected readonly query = injectQuery(() => ({
-    queryKey: trainingKeys.routineDetail(this.routineId()),
-    queryFn: () => firstValueFrom(this.api.getRoutine(this.routineId())),
+    queryKey: ['training', 'workout-prepare', this.routineId()],
+    queryFn: () => firstValueFrom(this.api.prepareWorkout(this.routineId())),
     enabled: Number.isFinite(this.routineId()),
   }));
-
-  /** Personal records for every exercise in the routine — batch-fetched
-   *  once the routine detail lands, so the tracker can flag live PRs
-   *  client-side without one round-trip per exercise. */
-  protected readonly prsQuery = injectQuery(() => {
-    const ids = (this.query.data()?.exercises ?? [])
-      .map(e => e.exerciseId);
-    return {
-      queryKey: ['training', 'personal-records', 'batch', ids.slice().sort()],
-      queryFn: () => firstValueFrom(this.api.listPersonalRecordsBatch(ids)),
-      enabled: ids.length > 0,
-      staleTime: 60_000,
-    };
-  });
 
   /** PRs bucketed by exerciseId for O(1) lookup from the exercise
    *  card's `personalRecords` input. */
   protected readonly prsByExercise = computed<ReadonlyMap<number, PersonalRecord[]>>(() => {
     const buckets = new Map<number, PersonalRecord[]>();
-    for (const pr of this.prsQuery.data() ?? []) {
+    for (const pr of this.query.data()?.personalRecords ?? []) {
       const bucket = buckets.get(pr.exerciseId) ?? [];
       bucket.push(pr);
       buckets.set(pr.exerciseId, bucket);
@@ -170,8 +163,23 @@ export class SessionPage {
     return buckets;
   });
 
+  /** ANTERIOR ghost sets bucketed by exerciseId. ExerciseEditor keys by
+   *  orderIndex inside its own scope. */
+  protected readonly previousByExercise = computed<ReadonlyMap<number, PreviousSet[]>>(() => {
+    const buckets = new Map<number, PreviousSet[]>();
+    for (const ps of this.query.data()?.previousSets ?? []) {
+      const bucket = buckets.get(ps.exerciseId) ?? [];
+      bucket.push(ps);
+      buckets.set(ps.exerciseId, bucket);
+    }
+    return buckets;
+  });
+
   protected prsFor(exerciseId: number): readonly PersonalRecord[] {
     return this.prsByExercise().get(exerciseId) ?? [];
+  }
+  protected previousFor(exerciseId: number): readonly PreviousSet[] {
+    return this.previousByExercise().get(exerciseId) ?? [];
   }
 
   /** Session-level totals for the header counter. */
@@ -198,7 +206,7 @@ export class SessionPage {
     // Seed the shared form service from the routine detail once it lands.
     effect(() => {
       const data = this.query.data();
-      if (data && !this.form.loaded()) this.form.loadFrom(data);
+      if (data && !this.form.loaded()) this.form.loadFrom(data.routine);
     });
 
     // Session cronómetro — 1s tick, cleaned up on destroy.

@@ -20,6 +20,7 @@ import {
   ExerciseCapabilities, PERMISSIVE_CAPS, RepsMode, RoutineExercise, RoutineSet,
 } from '@core/training/routine.model';
 import { PersonalRecord } from '@core/training/personal-record.model';
+import { PreviousSet } from '@core/training/workout-prepare.model';
 import { isPersonalRecord } from '../session/is-personal-record';
 import { InputMode } from '@core/training/exercise.model';
 import { TrainingActionsService } from '@core/training/training-actions.service';
@@ -100,6 +101,7 @@ import { ExercisePickerComponent } from './exercise-picker.component';
 
         <div class="header-legend" [style.grid-template-columns]="gridTemplate()">
           <span>Serie</span>
+          @if (showCheck()) { <span>Anterior</span> }
           @if (caps().weight) {
             @if (caps().bricks) {
               <span class="weight-header" (click)="openWeightModeSheet()">
@@ -124,6 +126,7 @@ import { ExercisePickerComponent } from './exercise-picker.component';
           }
           @if (caps().duration && !caps().reps) { <span>Tiempo</span> }
           @if (showRpe() && caps().rpe) { <span>RPE</span> }
+          @if (showCheck()) { <span></span> }
         </div>
 
         @for (s of exercise().sets; track $index) {
@@ -136,6 +139,7 @@ import { ExercisePickerComponent } from './exercise-picker.component';
             [showRpe]="showRpe()"
             [showCheck]="showCheck()"
             [isPr]="isPr(s)"
+            [previousSet]="previousFor($index)"
             [capabilities]="caps()"
             [inputMode]="inputMode()"
             [brickWeightKg]="brickWeight()"
@@ -162,7 +166,23 @@ export class ExerciseEditorComponent {
   /** Session-only: PRs for THIS exercise (filtered by parent from the
    *  batch fetch). Empty in editor mode. */
   readonly personalRecords = input<readonly PersonalRecord[]>([]);
+  /** Session-only: ANTERIOR ghost values for THIS exercise, one row per
+   *  set that had history in the user's most recent workout of the
+   *  exercise. Keyed by orderIndex for O(1) lookup per SetEditor. */
+  readonly previousSets = input<readonly PreviousSet[]>([]);
   readonly checkSet = output<number>();
+
+  /** Previous set by 0-based orderIndex — matches how the current
+   *  editor's sets carry their own orderIndex. Falls back to index-in-
+   *  array for rows we haven't seen before. */
+  protected readonly previousByOrder = computed<ReadonlyMap<number, PreviousSet>>(() => {
+    const map = new Map<number, PreviousSet>();
+    for (const ps of this.previousSets()) map.set(ps.orderIndex, ps);
+    return map;
+  });
+  protected previousFor(setIndex: number): PreviousSet | null {
+    return this.previousByOrder().get(setIndex) ?? null;
+  }
 
   /** Per-set PR flag — client-side preview. Recomputes when the draft
    *  or the PR set changes. */
@@ -262,13 +282,16 @@ export class ExerciseEditorComponent {
   protected readonly gridTemplate = computed(() => {
     const c = this.caps();
     const serie = '48px';
+    const anterior = this.showCheck() ? '1.2fr' : '';
     const kg = c.weight ? '1fr' : '';
     const reps = c.reps
       ? (this.repsMode() === 'RANGE' ? '1.4fr' : '1fr')
       : '';
     const duration = (c.duration && !c.reps) ? '1fr' : '';
     const rpe = (this.showRpe() && c.rpe) ? '60px' : '';
-    return [serie, kg, reps, duration, rpe].filter(Boolean).join(' ');
+    const check = this.showCheck() ? '40px' : '';
+    return [serie, anterior, kg, reps, duration, rpe, check]
+      .filter(Boolean).join(' ');
   });
 
   /** Guards the show-RPE inference so a set edit does not fight the
