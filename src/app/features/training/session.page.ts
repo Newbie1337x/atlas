@@ -120,6 +120,9 @@ export class SessionPage {
   protected readonly form = inject(RoutineEditFormService);
 
   protected readonly saving = signal(false);
+  /** True after a successful terminate — short-circuits the discard
+   *  guard so the follow-up navigation does not re-prompt. */
+  private savedOrDiscarded = false;
 
   /** Idempotency key for the workout on the backend. Minted once, sent
    *  in every upsert so retries / offline resend land on the same row. */
@@ -224,6 +227,10 @@ export class SessionPage {
   private confirming = false;
 
   async confirmDiscardIfDirty(): Promise<boolean> {
+    // No prompt after Terminar / manual discard already resolved the
+    // session — those paths flip `savedOrDiscarded` and the follow-up
+    // Router.navigate re-fires this guard.
+    if (this.savedOrDiscarded) return true;
     if (this.completedCount() === 0 && !this.form.dirty()) return true;
     if (this.confirming) return false;
     this.confirming = true;
@@ -244,6 +251,7 @@ export class SessionPage {
       try { await firstValueFrom(this.api.discardWorkout(this.clientUuid)); }
       catch { /* ignore */ }
       this.form.markPristine();
+      this.savedOrDiscarded = true;
       return true;
     } finally {
       this.confirming = false;
@@ -304,6 +312,7 @@ export class SessionPage {
       }
       await this.queryClient.invalidateQueries({ queryKey: trainingKeys.all });
       this.form.markPristine();
+      this.savedOrDiscarded = true;
       this.router.navigate(['/training/routines', draft.id]);
     } catch (err) {
       const message = err instanceof HttpError
