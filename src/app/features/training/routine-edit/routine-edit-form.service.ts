@@ -187,7 +187,7 @@ export class RoutineEditFormService {
       const partner = d.exercises[partnerIndex];
       if (!current || !partner) return d;
       const groupId =
-        current.supersetGroupId ?? partner.supersetGroupId ?? crypto.randomUUID();
+        current.supersetGroupId ?? partner.supersetGroupId ?? freshGroupId();
       return {
         ...d,
         exercises: d.exercises.map((ex, i) =>
@@ -295,6 +295,18 @@ export class RoutineEditFormService {
       exercises: d.exercises.map((ex, i) => (i === exerciseIndex ? fn(ex) : ex)),
     }));
   }
+}
+
+/**
+ * Fresh superset group id. `crypto.randomUUID()` would be nicer but
+ * requires a secure context (HTTPS or localhost) — accessing the app
+ * via LAN IP over HTTP leaves it undefined and throws. A short random
+ * string is plenty for a groupId whose only invariant is "unique
+ * across the ~10 groups a single routine draft could ever hold".
+ */
+function freshGroupId(): string {
+  return Math.random().toString(36).slice(2, 10)
+       + Date.now().toString(36);
 }
 
 function emptySet(orderIndex: number): RoutineSet {
