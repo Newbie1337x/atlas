@@ -30,6 +30,7 @@ import { ExerciseIconComponent } from '../shared/exercise-icon.component';
 import { RestPickerComponent } from '../shared/rest-picker.component';
 import { SelectSheetService } from '@shared/ui/select-sheet.service';
 import { ReorderModalComponent } from '@shared/ui/reorder-modal.component';
+import { ExercisePickerComponent } from './exercise-picker.component';
 
 /**
  * One exercise inside the routine editor. Header shows the name + a single
@@ -346,7 +347,7 @@ export class ExerciseEditorComponent {
       case 'reps':     this.openRepsOptions(); break;
       case 'rpe':      this.toggleRpe(); break;
       case 'reorder':  this.openReorder(); break;
-      case 'replace':  this.actions.notImplemented('Reemplazar'); break;
+      case 'replace':  this.openReplace(); break;
       case 'superset': this.actions.notImplemented('Superserie'); break;
       case 'delete':   this.confirmDelete(); break;
     }
@@ -420,6 +421,24 @@ export class ExerciseEditorComponent {
       },
     });
     await modal.present();
+  }
+
+  /** Opens the exercise picker (same modal as "Agregar ejercicio") in
+   *  replace mode — sets / rest / notes / superset / repsMode stay,
+   *  only the exercise identity + capabilities swap. Backend guard
+   *  will reject sets that carry fields the new exercise doesn't
+   *  allow (weight on bodyweight, etc.) — user sees the invalidation
+   *  at Guardar time and can clear those manually. */
+  private async openReplace(): Promise<void> {
+    const modal = await this.modal.create({ component: ExercisePickerComponent });
+    await modal.present();
+    const { data } = await modal.onDidDismiss<{
+      id: number; name: string; demoMediaUrl: string | null;
+      capabilities: ExerciseCapabilities | null;
+    }>();
+    if (!data) return;
+    this.form.replaceExercise(
+      this.index(), data.id, data.name, data.demoMediaUrl, data.capabilities);
   }
 
   private async confirmDelete(): Promise<void> {

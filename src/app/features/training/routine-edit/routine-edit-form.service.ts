@@ -144,6 +144,33 @@ export class RoutineEditFormService {
     }));
   }
 
+  /**
+   * Swap an exercise's identity (id + name + iconUrl + capabilities)
+   * while KEEPING its sets, rest, notes, superset group and repsMode.
+   * The frontend Guardar already caps-strips at save time, and the
+   * backend guard rejects any set field the new exercise's caps don't
+   * allow, so mismatched persisted values fail loudly rather than
+   * silently. Reset those we know are always identity-scoped: id=0
+   * so the backend treats it as a new junction row (old
+   * routine_exercise_id gets orphan-removed on save).
+   */
+  replaceExercise(
+    exerciseIndex: number,
+    newExerciseId: number,
+    newExerciseName: string,
+    newIconUrl: string | null,
+    newCapabilities: ExerciseCapabilities | null,
+  ): void {
+    this.updateExerciseAt(exerciseIndex, ex => ({
+      ...ex,
+      id: 0,
+      exerciseId: newExerciseId,
+      exerciseName: newExerciseName,
+      exerciseIconUrl: newIconUrl,
+      capabilities: newCapabilities,
+    }));
+  }
+
   moveExercise(from: number, to: number): void {
     if (from === to) return;
     this.patch(d => {
