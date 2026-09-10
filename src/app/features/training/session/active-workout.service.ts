@@ -142,7 +142,36 @@ export class ActiveWorkoutService {
     }
   }
 
-  /** Human-readable elapsed for the header + mini-bar. */
+  /** Override the total elapsed time in place — for the "Duración"
+   *  tap on the tracker KPI row. Rewrites `_startedAt` to make
+   *  `now - startedAt` equal `seconds` so the live tick keeps running
+   *  from the corrected baseline; the upsert body pulls
+   *  `startedAt.toISOString()` so the persisted timestamp stays
+   *  consistent with the header — no separate override state, no
+   *  drift. */
+  editElapsed(seconds: number): void {
+    const s = Math.max(0, Math.round(seconds));
+    this._startedAt.set(new Date(Date.now() - s * 1000));
+    this._elapsedSeconds.set(s);
+    this.startTick();
+  }
+
+  /** Client-side total volume (weight × reps of completed sets). Used
+   *  by the tracker's KPI row and the save modal's preview. */
+  totalVolumeKg(): number {
+    let sum = 0;
+    for (const ex of this.form.draft()?.exercises ?? []) {
+      for (const s of ex.sets) {
+        if (!s.completed) continue;
+        const kg = Number(s.actualWeightKg ?? s.targetWeightKg ?? 0);
+        const reps = s.actualReps ?? s.targetRepsMax ?? s.targetRepsMin ?? 0;
+        if (kg > 0 && reps > 0) sum += kg * reps;
+      }
+    }
+    return sum;
+  }
+
+  /** Digital-clock elapsed for the compact mini-bar label. */
   elapsedMmss(): string {
     const s = this._elapsedSeconds();
     const h = Math.floor(s / 3600);
@@ -151,6 +180,17 @@ export class ActiveWorkoutService {
     const mm = m.toString().padStart(2, '0');
     const rr = r.toString().padStart(2, '0');
     return h > 0 ? `${h}:${mm}:${rr}` : `${mm}:${rr}`;
+  }
+
+  /** "1h 5min" / "12min 15s" / "45s" — for the large KPI row. */
+  elapsedHuman(): string {
+    const s = this._elapsedSeconds();
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const r = s % 60;
+    if (h > 0) return `${h}h ${m}min`;
+    if (m > 0) return `${m}min ${r}s`;
+    return `${r}s`;
   }
 
   /** First exercise name for the mini-bar label (Hevy shows "Press

@@ -44,12 +44,28 @@ import { ActiveWorkoutService } from './session/active-workout.service';
     ExerciseEditorComponent, SessionRestTimerComponent,
   ],
   styles: [`
-    .elapsed {
-      display: block;
-      font-size: 0.75em;
-      color: var(--ion-color-medium, #666);
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--ion-color-step-100, rgba(255,255,255,0.06));
+    }
+    .kpi {
+      display: flex; flex-direction: column;
+      background: transparent; border: 0; padding: 0;
+      text-align: left; cursor: default;
+    }
+    .kpi.editable { cursor: pointer; }
+    .kpi-label {
+      font-size: 0.8rem; color: var(--ion-color-medium, #888);
+      margin-bottom: 2px;
+    }
+    .kpi-value {
+      font-size: 1.1rem; font-weight: 600;
+      color: var(--ion-text-color, #fff);
       font-variant-numeric: tabular-nums;
     }
+    .kpi.editable .kpi-value { color: var(--ion-color-primary, #3880ff); }
   `],
   template: `
     <ion-header>
@@ -61,9 +77,6 @@ import { ActiveWorkoutService } from './session/active-workout.service';
         </ion-buttons>
         <ion-title>
           {{ active.form.draft()?.title ?? 'Entrenamiento' }}
-          <span class="elapsed">
-            {{ active.elapsedMmss() }} · {{ completedCount() }}/{{ totalCount() }} series
-          </span>
         </ion-title>
         <ion-buttons slot="end">
           <ion-button
@@ -78,6 +91,27 @@ import { ActiveWorkoutService } from './session/active-workout.service';
     </ion-header>
 
     <ion-content>
+      @if (active.isActive()) {
+        <!-- KPI row: Duración (tap to edit total elapsed) · Volumen ·
+             Series. Sits at the top of the content so the toolbar stays
+             clean and the stats are readable at a glance. Series and
+             Volumen recompute on every draft mutation via the parent
+             computeds; Duración pulls the live tick from the service. -->
+        <div class="kpi-row" role="list">
+          <button type="button" class="kpi editable" (click)="editDuration()" role="listitem">
+            <span class="kpi-label">Duración</span>
+            <span class="kpi-value">{{ active.elapsedHuman() }}</span>
+          </button>
+          <div class="kpi" role="listitem">
+            <span class="kpi-label">Volumen</span>
+            <span class="kpi-value">{{ volumeLabel() }}</span>
+          </div>
+          <div class="kpi" role="listitem">
+            <span class="kpi-label">Series</span>
+            <span class="kpi-value">{{ completedCount() }}</span>
+          </div>
+        </div>
+      }
       @if (query.isPending() && !active.isActive()) {
         <ion-spinner />
       } @else if (query.isError() && !active.isActive()) {
@@ -172,19 +206,21 @@ export class SessionPage {
     return n;
   });
 
-  /** Client-side total volume for the save screen's KPI card. */
+  /** Client-side total volume for the KPI row + save screen preview.
+   *  Delegates to the service so the mini-bar (future) and this page
+   *  read the same number. */
   protected readonly totalVolumeKg = computed(() => {
-    let sum = 0;
-    for (const ex of this.active.form.draft()?.exercises ?? []) {
-      for (const s of ex.sets) {
-        if (!s.completed) continue;
-        const kg = Number(s.actualWeightKg ?? s.targetWeightKg ?? 0);
-        const reps = s.actualReps ?? s.targetRepsMax ?? s.targetRepsMin ?? 0;
-        if (kg > 0 && reps > 0) sum += kg * reps;
-      }
-    }
-    return sum;
+    // Read a draft signal so the computed retriggers when a set moves.
+    void this.active.form.draft();
+    return this.active.totalVolumeKg();
   });
+
+  /** Compact volume label for the KPI cell — "2,372 kg" / "1.2t". */
+  protected volumeLabel(): string {
+    const kg = this.totalVolumeKg();
+    if (kg >= 1000) return `${(kg / 1000).toFixed(1)}t`;
+    return `${Math.round(kg)} kg`;
+  }
 
   constructor() {
     addIcons({
@@ -236,6 +272,35 @@ export class SessionPage {
     const exercise = this.active.form.draft()?.exercises[exerciseIndex];
     const rest = set.restSecondsAfter ?? exercise?.restSeconds ?? 0;
     if (rest > 0) this.active.restTimer.start(rest);
+  }
+
+  /** Tap on the Duración KPI — pops an alert with H + Min inputs to
+   *  overwrite the total elapsed time. Under the hood we shift
+   *  `startedAt` back so the tick keeps rolling from the corrected
+   *  baseline. Live mini-bar reflects the change immediately. */
+  protected async editDuration(): Promise<void> {
+    const totalSec = this.active.elapsedSeconds();
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const alert = await this.alerts.create({
+      header: 'Duración del entrenamiento',
+      inputs: [
+        { name: 'h', type: 'number', min: 0, max: 24, value: h, placeholder: 'horas' },
+        { name: 'm', type: 'number', min: 0, max: 59, value: m, placeholder: 'minutos' },
+      ],
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Guardar', role: 'confirm', handler: (data: { h: string; m: string }) => {
+            const hours = Math.max(0, Math.floor(Number(data.h) || 0));
+            const minutes = Math.max(0, Math.min(59, Math.floor(Number(data.m) || 0)));
+            this.active.editElapsed(hours * 3600 + minutes * 60);
+            return true;
+          },
+        },
+      ],
+    });
+    await alert.present();
   }
 
   protected async openPicker(): Promise<void> {
