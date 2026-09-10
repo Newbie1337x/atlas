@@ -54,6 +54,10 @@ import { ActiveWorkoutService } from './session/active-workout.service';
       display: flex; flex-direction: column;
       background: transparent; border: 0; padding: 0;
       text-align: left; cursor: default;
+      /* Buttons default to their own color — force inherit so the value
+         span follows ion-content's text color (light + dark safe). */
+      color: inherit;
+      font: inherit;
     }
     .kpi.editable { cursor: pointer; }
     .kpi-label {
@@ -62,7 +66,10 @@ import { ActiveWorkoutService } from './session/active-workout.service';
     }
     .kpi-value {
       font-size: 1.1rem; font-weight: 600;
-      color: var(--ion-text-color, #fff);
+      /* Inherit ion-content's text color so we track light + dark mode
+         without hard-coding a fallback that ends up invisible against
+         the wrong background. */
+      color: inherit;
       font-variant-numeric: tabular-nums;
     }
     .kpi.editable .kpi-value { color: var(--ion-color-primary, #3880ff); }
