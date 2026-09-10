@@ -6,9 +6,11 @@ import { IonNote, IonRouterOutlet } from '@ionic/angular';
 import { NetworkService } from '@core/network/network.service';
 import { ActiveWorkoutBarComponent } from '../training/session/active-workout-bar.component';
 
-/** URL patterns that hide the top notif / chat strip. Any route
- *  ending in an editor (/edit) is considered immersive. */
-const HIDE_CHROME_RE = /\/edit(\/|$)/;
+/** URL patterns where the top notif / chat strip is allowed. Home is
+ *  the "landing" surface (social + notifications live here mentally),
+ *  so we anchor these icons there. Everything else (training tracker,
+ *  routine editor, profile, secondary pages) hides the strip. */
+const SHOW_CHROME_RE = /^\/home(\/|$|\?)/;
 
 /** URL patterns that hide the bottom tab bar: routine detail,
  *  routine editor (create + edit), active workout tracker. Keeps
@@ -135,16 +137,16 @@ export class ShellPage {
   protected readonly network = inject(NetworkService);
   private readonly router = inject(Router);
 
-  /** Hide the Notificaciones / Chat strip on immersive editors where
-   *  every pixel counts (routine editor is the current one). Add more
-   *  routes here as they need the full canvas. */
+  /** Show the Notificaciones / Chat strip only on the Home tab. Every
+   *  other page (training tracker, editor, profile, chat/notifs
+   *  themselves, secondary pages) hides it to keep the top clean. */
   protected readonly showSecondary = toSignal(
     this.router.events.pipe(
       filter((e): e is NavigationEnd => e instanceof NavigationEnd),
-      map(e => !HIDE_CHROME_RE.test(e.urlAfterRedirects)),
-      startWith(!HIDE_CHROME_RE.test(this.router.url)),
+      map(e => SHOW_CHROME_RE.test(e.urlAfterRedirects)),
+      startWith(SHOW_CHROME_RE.test(this.router.url)),
     ),
-    { initialValue: true },
+    { initialValue: false },
   );
 
   /** Hide the bottom tab bar on nested / immersive pages — routine
