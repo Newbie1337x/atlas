@@ -23,7 +23,8 @@ import { ExerciseEditorComponent } from './routine-edit/exercise-editor.componen
 import { ExercisePickerComponent } from './routine-edit/exercise-picker.component';
 import { RestTimerService } from './session/rest-timer.service';
 import { SessionRestTimerComponent } from './session/session-rest-timer.component';
-import { routineDraftToUpsertRequest } from './session/session-to-upsert';
+import { routineDraftToUpsertRequest, WorkoutSaveMetadata } from './session/session-to-upsert';
+import { SaveWorkoutModal, SaveWorkoutResult } from './session/save-workout.modal';
 
 /**
  * Active workout tracker. Route: /training/session/:routineId.
@@ -303,47 +304,74 @@ export class SessionPage {
     if (ok) this.router.navigate(['/training']);
   }
 
+  /**
+   * Client-side total volume for the save screen's KPI card — sum of
+   * (weight × reps) across completed sets. Kept in sync with the draft
+   * so the modal reads it as a signal input. The backend recomputes it
+   * server-side at /complete anyway (source of truth), this is just for
+   * the pre-save preview.
+   */
+  protected readonly totalVolumeKg = computed(() => {
+    let sum = 0;
+    for (const ex of this.form.draft()?.exercises ?? []) {
+      for (const s of ex.sets) {
+        if (!s.completed) continue;
+        const kg = Number(s.actualWeightKg ?? s.targetWeightKg ?? 0);
+        const reps = s.actualReps ?? s.targetRepsMax ?? s.targetRepsMin ?? 0;
+        if (kg > 0 && reps > 0) sum += kg * reps;
+      }
+    }
+    return sum;
+  });
+
+  /** Opens the "Guardar entreno" screen — collects title / notes /
+   *  visibility / duration override / routine-update choice, then
+   *  fires finalize() with the picked metadata. Replaces the 3-option
+   *  alert with a proper form. */
   protected async confirmTerminar(): Promise<void> {
     const draft = this.form.draft();
     if (!draft) return;
-    const hasRoutineChanges = this.form.dirty() && draft.id > 0;
-    const countsMsg = `${this.completedCount()} de ${this.totalCount()} series marcadas.`;
 
-    // Three-option alert when the user modified targets / added sets /
-    // added an exercise etc: they choose to persist those changes to
-    // the routine template or discard them (workout gets saved either way).
-    // Buttons carry `data` — Ionic threads it through onDidDismiss.
-    const alert = await this.alerts.create({
-      header: '¿Terminar entrenamiento?',
-      message: hasRoutineChanges
-        ? `${countsMsg} Hiciste cambios en la rutina — ¿los guardas en el template?`
-        : countsMsg,
-      buttons: hasRoutineChanges
-        ? [
-            { text: 'Cancelar', role: 'cancel' },
-            { text: 'Descartar cambios', role: 'terminate' },
-            { text: 'Actualizar rutina', role: 'update' },
-          ]
-        : [
-            { text: 'Seguir entrenando', role: 'cancel' },
-            { text: 'Terminar', role: 'terminate' },
-          ],
+    const modal = await this.modal.create({
+      component: SaveWorkoutModal,
+      componentProps: {
+        initialTitle: draft.title ?? '',
+        elapsedSeconds: this.elapsedSeconds(),
+        totalVolumeKg: this.totalVolumeKg(),
+        completedSetsCount: this.completedCount(),
+        totalSetsCount: this.totalCount(),
+        isDirty: this.form.dirty() && draft.id > 0,
+      },
     });
-    await alert.present();
-    const { role } = await alert.onDidDismiss();
-    if (role === 'cancel' || role === 'backdrop') return;
-    await this.finalize(role === 'update');
+    await modal.present();
+    const result = await modal.onDidDismiss<SaveWorkoutResult | null>();
+    if (result.role === 'save' && result.data) {
+      await this.finalize(result.data.updateRoutine, result.data.metadata);
+    } else if (result.role === 'discard') {
+      await this.discardFromModal();
+    }
+  }
+
+  /** Executes discard from the save screen — same flow as the header
+   *  Cancel + confirm alert, but the modal already showed the alert so
+   *  we skip re-prompting via savedOrDiscarded. */
+  private async discardFromModal(): Promise<void> {
+    try { await firstValueFrom(this.api.discardWorkout(this.clientUuid)); }
+    catch { /* ignore — workout may never have been upserted */ }
+    this.form.markPristine();
+    this.savedOrDiscarded = true;
+    void this.router.navigate(['/training']);
   }
 
   /** Always PUT /workouts + POST /complete. If `updateRoutine` was
    *  picked, also PUT /routines with the (edited) draft so the template
    *  reflects what the user actually wants going forward. */
-  private async finalize(updateRoutine: boolean): Promise<void> {
+  private async finalize(updateRoutine: boolean, metadata: WorkoutSaveMetadata = {}): Promise<void> {
     const draft = this.form.draft();
     if (!draft) return;
     this.saving.set(true);
     try {
-      const body = routineDraftToUpsertRequest(draft, this.startedAt.toISOString());
+      const body = routineDraftToUpsertRequest(draft, this.startedAt.toISOString(), metadata);
       await firstValueFrom(this.api.upsertWorkout(this.clientUuid, body));
       await firstValueFrom(this.api.completeWorkout(this.clientUuid));
       if (updateRoutine && draft.id > 0) {

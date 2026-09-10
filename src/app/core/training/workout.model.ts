@@ -67,8 +67,15 @@ export interface WorkoutDraft {
 export interface UpsertWorkoutRequest {
   globalProfileId: number;  // Backend overrides from JWT; can be 0.
   routineId: number | null;
+  /** Optional workout title — e.g. "Miércoles (Espalda)". Null keeps
+   *  the routine's default. Set on the save screen before /complete. */
+  title?: string | null;
   startedAt: string;
   completedAt?: string | null;
+  /** Override for the "Minutos entrenados" input on the save screen.
+   *  When set, backend uses this instead of the wall-clock diff between
+   *  startedAt and completedAt. Null keeps the derived value. */
+  durationSeconds?: number | null;
   notes?: string | null;
   mediaUrls?: string[];
   visibility?: WorkoutVisibility;

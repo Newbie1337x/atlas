@@ -1,6 +1,16 @@
 import { RoutineDetail, RoutineSet } from '@core/training/routine.model';
-import { UpsertWorkoutRequest } from '@core/training/workout.model';
+import { UpsertWorkoutRequest, WorkoutVisibility } from '@core/training/workout.model';
 import { uuidV4 } from '@core/uuid';
+
+/** Save-screen inputs merged into the upsert body. Anything the user
+ *  edited in the "Guardar entreno" step lands here — the untouched
+ *  fields fall back to routine defaults inside the mapper. */
+export interface WorkoutSaveMetadata {
+  title?: string | null;
+  notes?: string | null;
+  visibility?: WorkoutVisibility;
+  durationSeconds?: number | null;
+}
 
 /**
  * Transform the routine-shaped draft (mutated in place by the shared
@@ -27,12 +37,16 @@ import { uuidV4 } from '@core/uuid';
 export function routineDraftToUpsertRequest(
   draft: RoutineDetail,
   startedAt: string,
+  metadata: WorkoutSaveMetadata = {},
 ): UpsertWorkoutRequest {
   return {
     globalProfileId: 0, // backend overrides from JWT
     routineId: draft.id > 0 ? draft.id : null,
+    title: metadata.title ?? null,
     startedAt,
-    notes: draft.notes ?? undefined,
+    durationSeconds: metadata.durationSeconds ?? null,
+    notes: metadata.notes ?? draft.notes ?? undefined,
+    visibility: metadata.visibility ?? undefined,
     exercises: draft.exercises.map(ex => ({
       id: uuidV4(),
       orderIndex: ex.orderIndex,
