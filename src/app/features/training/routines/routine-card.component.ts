@@ -45,8 +45,8 @@ import { SelectSheetService } from '@shared/ui/select-sheet.service';
       <ion-button
         slot="end"
         size="small"
-        [routerLink]="['/training/session']"
-        [queryParams]="{ routineId: routine().id }">
+        [routerLink]="['/training/session', routine().id]"
+        (click)="$event.stopPropagation()">
         Empezar
       </ion-button>
       <ion-button
