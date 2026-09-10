@@ -107,7 +107,11 @@ const TOP_LEVEL_TAB_RE = /^\/(home|training|profile)\/?(\?|$)/;
     }
 
     <div class="main-content">
-      <ion-router-outlet></ion-router-outlet>
+      <!-- animated:false → no horizontal slide when switching between
+           child tabs (Inicio / Entrenamiento / Perfil) or drilling
+           into routine detail / session. Modal + sheet transitions
+           are unaffected (they live on ion-modal). -->
+      <ion-router-outlet [animated]="false"></ion-router-outlet>
     </div>
 
     @if (showActiveBar()) {

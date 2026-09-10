@@ -6,6 +6,12 @@ import { IonApp, IonRouterOutlet } from '@ionic/angular';
  * root, back-button routing). IonRouterOutlet integrates Ionic's page
  * transitions with the Angular router — use this instead of plain
  * <router-outlet> at the top level.
+ *
+ * `[animated]="false"` on the outlet drops the horizontal slide between
+ * top-level pages (tab switches, Empezar rutina → tracker, etc). Modal
+ * / sheet animations are unaffected — they live on `ion-modal`, not on
+ * the outlet, so vertical-up sheets (reorder, exercise picker, save
+ * workout) keep their transition.
  */
 @Component({
   selector: 'app-root',
@@ -14,7 +20,7 @@ import { IonApp, IonRouterOutlet } from '@ionic/angular';
   imports: [IonApp, IonRouterOutlet],
   template: `
     <ion-app>
-      <ion-router-outlet></ion-router-outlet>
+      <ion-router-outlet [animated]="false"></ion-router-outlet>
     </ion-app>
   `,
 })
