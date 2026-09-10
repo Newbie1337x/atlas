@@ -16,7 +16,7 @@ import {
 import { TrainingApi } from '@core/training/training.api';
 import { trainingKeys } from '@core/training/training.keys';
 import {
-  WorkoutDetailExercise, WorkoutDetailSet,
+  WorkoutSummaryExercise, WorkoutSummarySet,
 } from '@core/training/workout.model';
 
 /**
@@ -94,7 +94,7 @@ import {
           <section class="section">
             <h3>Récords</h3>
             <ul class="pr-list">
-              @for (pr of prSets(); track pr.setId) {
+              @for (pr of prSets(); track pr.key) {
                 <li>
                   <span class="pr-badge" aria-hidden="true">🏆</span>
                   <span class="pr-name">{{ pr.exerciseName }}</span>
@@ -108,14 +108,14 @@ import {
         <section class="section">
           <h3>Ejercicios</h3>
           <ul class="ex-list">
-            @for (ex of w.exercises; track ex.id) {
+            @for (ex of w.exercises; track $index) {
               <li class="ex">
                 <div class="ex-head">
                   <span class="ex-name">{{ ex.exerciseName ?? 'Ejercicio #' + ex.exerciseId }}</span>
                   <span class="ex-meta">{{ completedSetsFor(ex) }}/{{ ex.sets.length }} · {{ topWeightFor(ex) }}</span>
                 </div>
                 <ul class="ex-sets">
-                  @for (s of ex.sets; track s.id) {
+                  @for (s of ex.sets; track $index) {
                     <li class="ex-set" [class.done]="s.completed" [class.pr]="s.isPersonalRecord">
                       <span class="set-idx">{{ $index + 1 }}</span>
                       <span class="set-body">{{ setLabel(s) }}</span>
@@ -149,7 +149,7 @@ export class WorkoutSummaryPage {
 
   protected readonly query = injectQuery(() => ({
     queryKey: trainingKeys.workoutDetail(this.workoutId()),
-    queryFn: () => firstValueFrom(this.api.getWorkout(this.workoutId())),
+    queryFn: () => firstValueFrom(this.api.getWorkoutSummary(this.workoutId())),
     enabled: this.workoutId().length > 0,
   }));
 
@@ -177,25 +177,29 @@ export class WorkoutSummaryPage {
   }
 
   /** PR rows flattened across exercises so the "Récords" section can
-   *  render them together with exercise name + set detail. */
+   *  render them together with exercise name + set detail. Key is
+   *  exerciseId + local set index — the slim shape has no set uuid. */
   protected readonly prSets = computed<PrSetRow[]>(() => {
     const w = this.query.data();
     if (!w) return [];
     const out: PrSetRow[] = [];
     for (const ex of w.exercises) {
+      let i = 0;
       for (const s of ex.sets) {
-        if (!s.isPersonalRecord) continue;
-        out.push({
-          setId: s.id,
-          exerciseName: ex.exerciseName ?? `Ejercicio #${ex.exerciseId}`,
-          detail: this.setLabel(s),
-        });
+        if (s.isPersonalRecord) {
+          out.push({
+            key: `${ex.exerciseId}/${i}`,
+            exerciseName: ex.exerciseName ?? `Ejercicio #${ex.exerciseId}`,
+            detail: this.setLabel(s),
+          });
+        }
+        i++;
       }
     }
     return out;
   });
 
-  protected completedSetsFor(ex: WorkoutDetailExercise): number {
+  protected completedSetsFor(ex: WorkoutSummaryExercise): number {
     let n = 0;
     for (const s of ex.sets) if (s.completed) n++;
     return n;
@@ -204,7 +208,7 @@ export class WorkoutSummaryPage {
   /** "Best set" label for the exercise row — the max weightKg among
    *  completed sets, or the total duration for isometric holds. Empty
    *  when nothing was completed. */
-  protected topWeightFor(ex: WorkoutDetailExercise): string {
+  protected topWeightFor(ex: WorkoutSummaryExercise): string {
     let maxKg: number | null = null;
     let maxSec: number | null = null;
     for (const s of ex.sets) {
@@ -221,7 +225,7 @@ export class WorkoutSummaryPage {
     return '';
   }
 
-  protected setLabel(s: WorkoutDetailSet): string {
+  protected setLabel(s: WorkoutSummarySet): string {
     const parts: string[] = [];
     if (s.weightKg != null) parts.push(`${Number(s.weightKg)}kg`);
     if (s.reps != null) parts.push(`× ${s.reps}`);
@@ -262,7 +266,7 @@ export class WorkoutSummaryPage {
 }
 
 interface PrSetRow {
-  setId: string;
+  key: string;
   exerciseName: string;
   detail: string;
 }

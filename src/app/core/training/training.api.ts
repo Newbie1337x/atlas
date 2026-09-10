@@ -10,7 +10,7 @@ import { RoutineFolder, RoutineFolderRequest } from './folder.model';
 import {
   CreateRoutineRequest, RoutineDetail, RoutineSummary, UpdateRoutineRequest,
 } from './routine.model';
-import { UpsertWorkoutRequest, WorkoutDetail } from './workout.model';
+import { UpsertWorkoutRequest, WorkoutDetail, WorkoutSummaryDetail } from './workout.model';
 import { PersonalRecord } from './personal-record.model';
 import { WorkoutPrepare } from './workout-prepare.model';
 
@@ -145,11 +145,19 @@ export class TrainingApi {
   }
 
   /** Full workout with enrichment (per-set isPersonalRecord flag,
-   *  denormalized durationSeconds/totalVolumeKg/totalSets). Summary page
-   *  + history detail view. Backing GET /workouts/:id. */
+   *  denormalized durationSeconds/totalVolumeKg/totalSets). Social post
+   *  + future history detail view. Backing GET /workouts/:id. */
   getWorkout(id: string): Observable<WorkoutDetail> {
     return this.http.get<WorkoutDetail>(
       `${this.baseUrl}/api/training/workouts/${id}`);
+  }
+
+  /** Slim projection for the resumen page — everything the summary UI
+   *  renders, nothing else. Backing GET /workouts/:id/summary. Roughly
+   *  half the payload of the full detail. */
+  getWorkoutSummary(id: string): Observable<WorkoutSummaryDetail> {
+    return this.http.get<WorkoutSummaryDetail>(
+      `${this.baseUrl}/api/training/workouts/${id}/summary`);
   }
 
   discardWorkout(id: string): Observable<void> {

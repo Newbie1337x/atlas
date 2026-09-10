@@ -156,3 +156,36 @@ export interface WorkoutDetailSet {
   completed: boolean;
   isPersonalRecord: boolean;
 }
+
+/**
+ * Slim projection returned by GET /workouts/:id/summary — everything
+ * the resumen page renders, nothing else. Drops ids / status / notes /
+ * mediaUrls / visibility / set metadata the summary UI never shows.
+ * Roughly half the wire size of {@link WorkoutDetail}.
+ */
+export interface WorkoutSummaryDetail {
+  id: string;
+  title: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  durationSeconds: number | null;
+  totalVolumeKg: number | null;
+  totalSets: number | null;
+  exercises: WorkoutSummaryExercise[];
+}
+
+export interface WorkoutSummaryExercise {
+  exerciseId: number;
+  exerciseName: string | null;
+  exerciseIconUrl: string | null;
+  sets: WorkoutSummarySet[];
+}
+
+export interface WorkoutSummarySet {
+  reps: number | null;
+  weightKg: number | null;
+  durationSeconds: number | null;
+  distanceKm: number | null;
+  completed: boolean;
+  isPersonalRecord: boolean;
+}
