@@ -1,0 +1,67 @@
+.loading { display: flex; justify-content: center; padding: 32px; }
+
+.celebrate {
+  display: flex; align-items: center; gap: 16px;
+  padding: 20px 16px; margin: 8px;
+  border-radius: 16px;
+  color: #fff;
+  background: linear-gradient(135deg,
+    var(--ion-color-success, #2dd36f),
+    var(--ion-color-success-shade, #28ba62));
+}
+.celebrate ion-icon { font-size: 40px; flex-shrink: 0; }
+.celebrate-copy h2 { margin: 0 0 4px; font-size: 1.15rem; font-weight: 600; }
+.celebrate-copy p  { margin: 0; font-size: 0.85rem; opacity: 0.9; }
+
+.kpis {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 8px; padding: 0 8px; margin: 8px 0 16px;
+}
+.kpi {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 14px 4px; border-radius: 12px;
+  background: var(--ion-color-step-50, rgba(255,255,255,0.05));
+}
+.kpi ion-icon { font-size: 22px; color: var(--ion-color-medium, #888); margin-bottom: 4px; }
+.kpi-value { font-size: 1.15rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.kpi-label { font-size: 0.75rem; color: var(--ion-color-medium, #888); }
+
+.section { padding: 0 12px; margin-bottom: 20px; }
+.section h3 {
+  font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--ion-color-medium, #888);
+  margin: 8px 4px; font-weight: 600;
+}
+
+.pr-list, .ex-list, .ex-sets {
+  list-style: none; padding: 0; margin: 0;
+}
+.pr-list li {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; border-radius: 10px;
+  background: var(--ion-color-step-50, rgba(255,255,255,0.05));
+  margin-bottom: 6px;
+}
+.pr-badge { font-size: 1.1rem; line-height: 1; }
+.pr-name { flex: 1; font-weight: 600; }
+.pr-detail { color: var(--ion-color-medium, #888); font-variant-numeric: tabular-nums; }
+
+.ex {
+  padding: 12px; border-radius: 12px; margin-bottom: 8px;
+  background: var(--ion-color-step-50, rgba(255,255,255,0.05));
+}
+.ex-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 6px;
+}
+.ex-name { font-weight: 600; }
+.ex-meta { font-size: 0.85rem; color: var(--ion-color-medium, #888); font-variant-numeric: tabular-nums; }
+.ex-sets li {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 0; font-size: 0.9rem;
+  color: var(--ion-color-medium, #888);
+}
+.ex-set.done  { color: var(--ion-text-color, #fff); }
+.ex-set.pr    { color: var(--ion-color-warning-shade, #e0a800); }
+.set-idx { width: 20px; text-align: center; opacity: 0.6; font-variant-numeric: tabular-nums; }
+.set-body { flex: 1; font-variant-numeric: tabular-nums; }

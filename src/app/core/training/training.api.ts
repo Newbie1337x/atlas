@@ -144,6 +144,14 @@ export class TrainingApi {
       `${this.baseUrl}/api/training/workouts/${id}/complete`, {});
   }
 
+  /** Full workout with enrichment (per-set isPersonalRecord flag,
+   *  denormalized durationSeconds/totalVolumeKg/totalSets). Summary page
+   *  + history detail view. Backing GET /workouts/:id. */
+  getWorkout(id: string): Observable<WorkoutDetail> {
+    return this.http.get<WorkoutDetail>(
+      `${this.baseUrl}/api/training/workouts/${id}`);
+  }
+
   discardWorkout(id: string): Observable<void> {
     return this.http.post<void>(
       `${this.baseUrl}/api/training/workouts/${id}/discard`, {});

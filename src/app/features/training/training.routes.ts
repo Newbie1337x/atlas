@@ -23,6 +23,10 @@ export const trainingRoutes: Routes = [
   },
   { path: 'routines/:id',      loadComponent: () => import('./routine-detail.page').then((m) => m.RoutineDetailPage) },
   {
+    path: 'workouts/:id/summary',
+    loadComponent: () => import('./workout-summary.page').then((m) => m.WorkoutSummaryPage),
+  },
+  {
     // "new" is a reserved id — the editor treats it as create mode:
     // seeds an empty draft locally, POSTs on save, no backend call
     // until Guardar. See RoutineEditPage.isCreate().

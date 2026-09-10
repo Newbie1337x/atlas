@@ -23,4 +23,6 @@ export const trainingKeys = {
   /** Per-exercise KG/BRICKS preference for the current user. */
   inputPreference: (exerciseId: number) =>
     [...trainingKeys.all, 'input-preference', exerciseId] as const,
+  /** Full workout detail — summary page + history detail view. */
+  workoutDetail: (id: string) => [...trainingKeys.all, 'workout', id] as const,
 };

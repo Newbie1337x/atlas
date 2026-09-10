@@ -353,7 +353,11 @@ export class SessionPage {
       await this.queryClient.invalidateQueries({ queryKey: trainingKeys.all });
       this.form.markPristine();
       this.savedOrDiscarded = true;
-      this.router.navigate(['/training/routines', draft.id]);
+      // Route to the celebration summary. `fresh=1` picks the
+      // congratulatory banner + close-to-home behavior; without the
+      // param the same page serves as a plain history detail view.
+      void this.router.navigate(['/training/workouts', this.clientUuid, 'summary'],
+        { queryParams: { fresh: 1 } });
     } catch (err) {
       const message = err instanceof HttpError
         ? err.userMessage

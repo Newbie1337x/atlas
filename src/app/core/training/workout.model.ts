@@ -96,7 +96,56 @@ export interface UpsertWorkoutRequest {
   }>;
 }
 
-/** Backend response shape — mirrors upsert body plus id / server-set fields. */
-export interface WorkoutDetail extends UpsertWorkoutRequest {
+export type WorkoutStatus = 'IN_PROGRESS' | 'COMPLETED' | 'DISCARDED';
+
+/**
+ * Full backend response for GET /workouts/:id. Carries the denormalized
+ * summary counters (durationSeconds, totalVolumeKg, totalSets) set on
+ * complete, plus per-set isPersonalRecord flags and per-exercise
+ * name/icon from the detail enricher — everything the summary page
+ * needs in one round-trip.
+ */
+export interface WorkoutDetail {
   id: string;
+  globalProfileId: number;
+  routineId: number | null;
+  title: string | null;
+  status: WorkoutStatus;
+  startedAt: string;
+  completedAt: string | null;
+  durationSeconds: number | null;
+  totalVolumeKg: number | null;
+  totalSets: number | null;
+  notes: string | null;
+  mediaUrls: string[];
+  visibility: WorkoutVisibility;
+  exercises: WorkoutDetailExercise[];
+}
+
+export interface WorkoutDetailExercise {
+  id: string;
+  orderIndex: number;
+  exerciseId: number;
+  exerciseName: string | null;
+  exerciseIconUrl: string | null;
+  supersetGroupId: string | null;
+  restSeconds: number | null;
+  notes: string | null;
+  sets: WorkoutDetailSet[];
+}
+
+export interface WorkoutDetailSet {
+  id: string;
+  orderIndex: number;
+  setType: SetType;
+  reps: number | null;
+  weightKg: number | null;
+  durationSeconds: number | null;
+  distanceKm: number | null;
+  rpe: number | null;
+  actualRestSeconds: number | null;
+  inputMode: InputMode | null;
+  brickWeightKg: number | null;
+  completed: boolean;
+  isPersonalRecord: boolean;
 }
