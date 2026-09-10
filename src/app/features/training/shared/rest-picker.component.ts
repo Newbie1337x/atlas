@@ -4,7 +4,7 @@ import {
 } from '@angular/core';
 import { Overlay, OverlayModule, OverlayRef } from '@angular/cdk/overlay';
 import { TemplatePortal } from '@angular/cdk/portal';
-import { IonItem, IonLabel, IonIcon } from '@ionic/angular';
+import { IonIcon } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { stopwatchOutline } from 'ionicons/icons';
 import { RoutineSet } from '@core/training/routine.model';
