@@ -10,6 +10,11 @@ import { stopwatchOutline } from 'ionicons/icons';
 import { RoutineSet } from '@core/training/routine.model';
 import { REST_OPTIONS, formatRestSeconds } from './rest-values';
 
+/** Formatter for a seconds value → user-facing label. Overrides the
+ *  default rest formatter so the same picker can drive workout-duration
+ *  overrides or any other integer-seconds selection. */
+export type WheelFormatter = (s: number) => string;
+
 /**
  * Rest-duration picker with a bottom-sheet wheel.
  *
@@ -36,27 +41,29 @@ import { REST_OPTIONS, formatRestSeconds } from './rest-values';
   imports: [OverlayModule, IonIcon],
   styleUrl: './rest-picker.component.css',
   template: `
-    <button
-      type="button"
-      class="rest-row"
-      (click)="onRowClick()"
-      (pointerdown)="onRowPointerDown($event)"
-      (pointerup)="cancelLongPress()"
-      (pointercancel)="cancelLongPress()"
-      (pointerleave)="cancelLongPress()"
-      (pointermove)="onRowPointerMove($event)">
-      <ion-icon name="stopwatch-outline" aria-hidden="true" />
-      <span>Descanso: {{ label() }}</span>
-      @if (hasOverrides()) {
-        <span class="override-dot" aria-label="Algún set tiene descanso personalizado"></span>
-      }
-    </button>
+    @if (showTrigger()) {
+      <button
+        type="button"
+        class="rest-row"
+        (click)="onRowClick()"
+        (pointerdown)="onRowPointerDown($event)"
+        (pointerup)="cancelLongPress()"
+        (pointercancel)="cancelLongPress()"
+        (pointerleave)="cancelLongPress()"
+        (pointermove)="onRowPointerMove($event)">
+        <ion-icon name="stopwatch-outline" aria-hidden="true" />
+        <span>Descanso: {{ label() }}</span>
+        @if (hasOverrides()) {
+          <span class="override-dot" aria-label="Algún set tiene descanso personalizado"></span>
+        }
+      </button>
+    }
 
     <ng-template #sheetTpl>
       <div class="sheet" role="dialog" aria-label="Elegir descanso">
         <div class="grabber" (click)="cancel()"></div>
         <div class="sheet-header">
-          <span class="sheet-title">Descanso</span>
+          <span class="sheet-title">{{ title() }}</span>
           @if (subtitle()) {
             <span class="sheet-subtitle">{{ subtitle() }}</span>
           }
@@ -87,7 +94,7 @@ import { REST_OPTIONS, formatRestSeconds } from './rest-values';
           <!-- Base layer: scrollable, uniform grey items. -->
           <div #wheelEl class="wheel" (scroll)="onScroll()">
             <div class="wheel-inner">
-              @for (opt of options; track opt) {
+              @for (opt of options(); track opt) {
                 <div class="wheel-item">{{ format(opt) }}</div>
               }
             </div>
@@ -99,7 +106,7 @@ import { REST_OPTIONS, formatRestSeconds } from './rest-values';
                without any per-item state. Highlight border draws on top. -->
           <div class="wheel-lens" aria-hidden="true">
             <div #lensInnerEl class="wheel-inner wheel-inner-lens">
-              @for (opt of options; track opt) {
+              @for (opt of options(); track opt) {
                 <div class="wheel-item wheel-item-lens">{{ format(opt) }}</div>
               }
             </div>
@@ -120,12 +127,23 @@ import { REST_OPTIONS, formatRestSeconds } from './rest-values';
 })
 export class RestPickerComponent {
   readonly value = input<number | null>(null);
-  /** Rendered as a grey line under the "Descanso" title — usually the
+  /** Rendered as a grey line under the sheet title — usually the
    *  exercise name so the merchant sees which item they're editing. */
   readonly subtitle = input<string>('');
   /** When present, long-press on the row opens the expanded sheet with a
    *  per-set tab strip. Tap keeps editing the global (existing UX). */
   readonly sets = input<RoutineSet[] | null>(null);
+  /** Sheet title. Defaults to "Descanso" so existing consumers behave
+   *  as before; other pickers pass their own label (e.g. "Duración"). */
+  readonly title = input<string>('Descanso');
+  /** Values the wheel offers. Defaults to REST_OPTIONS (0..10min @5s). */
+  readonly options = input<readonly number[]>(REST_OPTIONS);
+  /** Renderer for wheel items + row label. Default = formatRestSeconds. */
+  readonly formatValue = input<WheelFormatter>(formatRestSeconds);
+  /** Render the "Descanso: xxx" button that opens the sheet. Off when
+   *  the parent owns the trigger and calls open() imperatively via
+   *  @ViewChild. */
+  readonly showTrigger = input<boolean>(true);
   readonly valueChange = output<number | null>();
   /** Emitted when a specific set's override is committed from a per-set tab. */
   readonly setRestChange = output<{ index: number; value: number | null }>();
@@ -143,7 +161,6 @@ export class RestPickerComponent {
 
   private overlayRef: OverlayRef | null = null;
 
-  protected readonly options = REST_OPTIONS;
   /** Value snapped to the center; updated on scroll. */
   protected readonly draft = signal<number>(0);
   /** -1 = global tab (or simple mode). 0..n-1 = per-set tab. */
@@ -151,7 +168,10 @@ export class RestPickerComponent {
   /** True when the sheet was opened via long-press (expanded UI on). */
   protected readonly expandedOpen = signal<boolean>(false);
 
-  protected readonly label = computed(() => formatRestSeconds(this.value()));
+  protected readonly label = computed(() => {
+    const v = this.value();
+    return this.formatValue()(v ?? 0);
+  });
   protected readonly hasOverrides = computed(() =>
     (this.sets() ?? []).some(s => s.restSecondsAfter != null));
 
@@ -216,6 +236,12 @@ export class RestPickerComponent {
       this.longPressFired = false;
       return;
     }
+    this.open(false);
+  }
+
+  /** Public API for parents that render their own trigger (showTrigger
+   *  = false) — call to open the wheel imperatively. */
+  openSheet(): void {
     this.open(false);
   }
 
@@ -299,7 +325,7 @@ export class RestPickerComponent {
   private jumpToCurrent(): void {
     const el = this.wheelEl?.nativeElement;
     if (!el) return;
-    const idx = Math.max(0, this.options.indexOf(this.draft()));
+    const idx = Math.max(0, this.options().indexOf(this.draft()));
     const top = idx * RestPickerComponent.ITEM_HEIGHT;
     el.scrollTop = top;
     // Programmatic scroll may not fire a scroll event on some engines;
@@ -321,8 +347,9 @@ export class RestPickerComponent {
     if (lens) lens.style.transform = `translateY(${-el.scrollTop}px)`;
 
     const idx = Math.round(el.scrollTop / RestPickerComponent.ITEM_HEIGHT);
-    const clamped = Math.max(0, Math.min(this.options.length - 1, idx));
-    const val = this.options[clamped];
+    const opts = this.options();
+    const clamped = Math.max(0, Math.min(opts.length - 1, idx));
+    const val = opts[clamped];
     if (val !== this.draft()) this.draft.set(val);
 
     // Debounced snap-to-nearest after inertia settles. 120ms is enough that
@@ -338,6 +365,6 @@ export class RestPickerComponent {
   }
 
   protected format(s: number): string {
-    return formatRestSeconds(s);
+    return this.formatValue()(s);
   }
 }

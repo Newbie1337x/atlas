@@ -1,5 +1,5 @@
 import {
-  ChangeDetectionStrategy, Component, computed, effect, inject,
+  ChangeDetectionStrategy, Component, ViewChild, computed, effect, inject,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -20,6 +20,28 @@ import { ExercisePickerComponent } from './routine-edit/exercise-picker.componen
 import { SessionRestTimerComponent } from './session/session-rest-timer.component';
 import { SaveWorkoutModal, SaveWorkoutResult } from './session/save-workout.modal';
 import { ActiveWorkoutService } from './session/active-workout.service';
+import { RestPickerComponent } from './shared/rest-picker.component';
+
+/** Wheel options for the "Duración" override: 0..30min at 1min, then
+ *  30..120min at 5min, then 120..480min at 15min. Steps are stored in
+ *  seconds so the picker's signature (integer seconds) stays uniform. */
+const DURATION_OPTIONS: readonly number[] = (() => {
+  const out: number[] = [0];
+  for (let m = 1; m <= 30; m++)                out.push(m * 60);
+  for (let m = 35; m <= 120; m += 5)           out.push(m * 60);
+  for (let m = 135; m <= 480; m += 15)         out.push(m * 60);
+  return out;
+})();
+
+/** "0" → "Apagado", "45" → "45s", "120" → "2min", "3720" → "1h 2min". */
+function formatDurationSeconds(s: number): string {
+  if (s === 0) return 'Apagado';
+  if (s < 60) return `${s}s`;
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (h > 0) return m === 0 ? `${h}h` : `${h}h ${m}min`;
+  return `${m}min`;
+}
 
 /**
  * Active workout tracker page. Route: /training/session/:routineId.
@@ -41,7 +63,7 @@ import { ActiveWorkoutService } from './session/active-workout.service';
   imports: [
     IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonContent,
     IonIcon, IonNote, IonSpinner,
-    ExerciseEditorComponent, SessionRestTimerComponent,
+    ExerciseEditorComponent, SessionRestTimerComponent, RestPickerComponent,
   ],
   styles: [`
     .kpi-row {
@@ -141,6 +163,18 @@ import { ActiveWorkoutService } from './session/active-workout.service';
       }
 
       <app-training-session-rest-timer />
+
+      <!-- Invisible wheel picker mounted at the page level. Opened
+           imperatively via #durationPicker.openSheet() from the
+           Duración KPI button. Same sheet UX as the rest picker. -->
+      <app-training-rest-picker
+        #durationPicker
+        [showTrigger]="false"
+        title="Duración"
+        [options]="durationOptions"
+        [formatValue]="formatDuration"
+        [value]="active.elapsedSeconds()"
+        (valueChange)="onDurationPicked($event)" />
     </ion-content>
   `,
 })
@@ -152,6 +186,14 @@ export class SessionPage {
   private readonly toasts = inject(ToastController);
   private readonly modal = inject(ModalController);
   protected readonly active = inject(ActiveWorkoutService);
+
+  @ViewChild('durationPicker') private durationPicker?: RestPickerComponent;
+
+  /** Referenced from the template — wheel picker options + formatter
+   *  for the "Duración" cell. Static constants kept as fields (not
+   *  computed) so change detection doesn't rebuild the arrays. */
+  protected readonly durationOptions = DURATION_OPTIONS;
+  protected readonly formatDuration = formatDurationSeconds;
 
   protected readonly routineId = computed(() => {
     const raw = this.route.snapshot.paramMap.get('routineId');
@@ -289,33 +331,18 @@ export class SessionPage {
     if (rest > 0) this.active.restTimer.start(rest);
   }
 
-  /** Tap on the Duración KPI — pops an alert with H + Min inputs to
-   *  overwrite the total elapsed time. Under the hood we shift
-   *  `startedAt` back so the tick keeps rolling from the corrected
-   *  baseline. Live mini-bar reflects the change immediately. */
-  protected async editDuration(): Promise<void> {
-    const totalSec = this.active.elapsedSeconds();
-    const h = Math.floor(totalSec / 3600);
-    const m = Math.floor((totalSec % 3600) / 60);
-    const alert = await this.alerts.create({
-      header: 'Duración del entrenamiento',
-      inputs: [
-        { name: 'h', type: 'number', min: 0, max: 24, value: h, placeholder: 'horas' },
-        { name: 'm', type: 'number', min: 0, max: 59, value: m, placeholder: 'minutos' },
-      ],
-      buttons: [
-        { text: 'Cancelar', role: 'cancel' },
-        {
-          text: 'Guardar', role: 'confirm', handler: (data: { h: string; m: string }) => {
-            const hours = Math.max(0, Math.floor(Number(data.h) || 0));
-            const minutes = Math.max(0, Math.min(59, Math.floor(Number(data.m) || 0)));
-            this.active.editElapsed(hours * 3600 + minutes * 60);
-            return true;
-          },
-        },
-      ],
-    });
-    await alert.present();
+  /** Tap on the Duración KPI — opens the same wheel-sheet picker used
+   *  for rest so the two duration inputs feel identical. The picker
+   *  writes back through onDurationPicked → active.editElapsed. */
+  protected editDuration(): void {
+    this.durationPicker?.openSheet();
+  }
+
+  /** Picker committed — writes the new elapsed to the active service,
+   *  which reshifts startedAt so the tick keeps flowing. Null (Apagado
+   *  wheel row) resets to zero. */
+  protected onDurationPicked(seconds: number | null): void {
+    this.active.editElapsed(seconds ?? 0);
   }
 
   protected async openPicker(): Promise<void> {
