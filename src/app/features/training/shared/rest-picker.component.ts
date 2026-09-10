@@ -177,9 +177,15 @@ export class RestPickerComponent {
 
   constructor() {
     addIcons({ 'stopwatch-outline': stopwatchOutline });
-    // Seed draft from input every time it changes so re-opening the simple
-    // picker starts at the persisted global value.
-    effect(() => this.draft.set(this.value() ?? 0));
+    // Seed draft from input every time it changes so re-opening the picker
+    // starts at the persisted value — but only while the sheet is CLOSED.
+    // Otherwise a `value` bound to a live signal (e.g. elapsed seconds on
+    // the tracker's Duración picker) would tick and yank the wheel back
+    // to "now" every second while the user is trying to scroll.
+    effect(() => {
+      const v = this.value();
+      if (this.overlayRef === null) this.draft.set(v ?? 0);
+    });
   }
 
   /** Set to true while we own a pushed history entry — Android's back
