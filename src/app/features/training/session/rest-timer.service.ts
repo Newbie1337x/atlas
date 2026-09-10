@@ -10,10 +10,12 @@ import { Injectable, computed, signal } from '@angular/core';
  * elapses regardless, so the reader computes remaining from a
  * captured `endsAt` timestamp on each tick — no drift on wake.
  *
- * Not providedIn:'root' — scoped to the session page providers so a
- * new session starts fresh with no stale state.
+ * `providedIn: 'root'` so the countdown survives the user tabbing away
+ * from the session page — the mini-bar workout indicator listens to
+ * the same instance. ActiveWorkoutService.discard() calls skip() to
+ * reset when a new workout starts.
  */
-@Injectable()
+@Injectable({ providedIn: 'root' })
 export class RestTimerService {
   /** Wall-clock epoch ms when the current countdown should end. */
   private readonly _endsAt = signal<number | null>(null);

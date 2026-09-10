@@ -10,9 +10,12 @@ const WORKOUT_ONLY_KEYS = new Set<string>([
 ]);
 
 /**
- * Draft state for the routine editor. NOT providedIn:'root' — the page
- * that hosts the editor lists it in its `providers` array so the draft
- * dies when the user leaves. Two editor tabs = two independent drafts.
+ * Draft state for the routine editor + session tracker. `providedIn:
+ * 'root'` so the session's instance survives navigation to another tab
+ * (mini-bar workout persistence). The routine-edit page shadows this
+ * with a local `providers: [RoutineEditFormService]` so opening an
+ * editor while a workout is active does NOT mix drafts — each editor
+ * tab gets its own scoped instance, the session keeps the root one.
  *
  * The draft mirrors RoutineDetail shape (with enricher fields
  * exerciseName / iconUrl) so the template can render exercise names
@@ -22,7 +25,7 @@ const WORKOUT_ONLY_KEYS = new Set<string>([
  * Every mutation replaces the array/object being changed (not in-place
  * mutation) so signal readers detect the change.
  */
-@Injectable()
+@Injectable({ providedIn: 'root' })
 export class RoutineEditFormService {
   private readonly _draft = signal<RoutineDetail | null>(null);
   /** Read-only view for templates. */

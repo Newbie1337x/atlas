@@ -2,10 +2,12 @@ import { CanDeactivateFn } from '@angular/router';
 import { SessionPage } from '../session.page';
 
 /**
- * Prompts "descartar entrenamiento?" before leaving /training/session
- * when the workout draft has ANY completed set. Same pattern as
- * routineEditDeactivateGuard — delegates to the page so it can reach
- * the page-scoped SessionFormService without cross-injector issues.
+ * No-op deactivate guard. Kept as an explicit shim so the route
+ * declaration reads intentionally: leaving /training/session while a
+ * workout is active is FINE — the state lives on the root
+ * ActiveWorkoutService and the mini-bar shows it from any tab. To
+ * discard, the user taps the trash on the mini-bar or the Descartar
+ * button in the "Guardar Entreno" save modal.
  */
 export const sessionDeactivateGuard: CanDeactivateFn<SessionPage> =
   (component) => component.confirmDiscardIfDirty();

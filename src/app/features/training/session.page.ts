@@ -1,9 +1,9 @@
 import {
-  ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal,
+  ChangeDetectionStrategy, Component, computed, effect, inject,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { injectQuery, injectQueryClient } from '@tanstack/angular-query-experimental';
+import { injectQuery } from '@tanstack/angular-query-experimental';
 import {
   IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonContent,
   IonIcon, IonNote, IonSpinner,
@@ -12,43 +12,32 @@ import {
 import { addIcons } from 'ionicons';
 import { addOutline, checkmarkDoneOutline, chevronBackOutline } from 'ionicons/icons';
 import { TrainingApi } from '@core/training/training.api';
-import { trainingKeys } from '@core/training/training.keys';
 import { HttpError } from '@core/errors/http-error';
-import { toUpdateRequest } from '@core/training/training-actions.service';
-import { uuidV4 } from '@core/uuid';
 import { PersonalRecord } from '@core/training/personal-record.model';
 import { PreviousSet } from '@core/training/workout-prepare.model';
-import { RoutineEditFormService } from './routine-edit/routine-edit-form.service';
 import { ExerciseEditorComponent } from './routine-edit/exercise-editor.component';
 import { ExercisePickerComponent } from './routine-edit/exercise-picker.component';
-import { RestTimerService } from './session/rest-timer.service';
 import { SessionRestTimerComponent } from './session/session-rest-timer.component';
-import { routineDraftToUpsertRequest, WorkoutSaveMetadata } from './session/session-to-upsert';
 import { SaveWorkoutModal, SaveWorkoutResult } from './session/save-workout.modal';
+import { ActiveWorkoutService } from './session/active-workout.service';
 
 /**
- * Active workout tracker. Route: /training/session/:routineId.
+ * Active workout tracker page. Route: /training/session/:routineId.
  *
- * REUSES the routine editor UI verbatim — same ExerciseEditorComponent,
- * same SetEditorComponent, same RoutineEditFormService. Session mode
- * differs by exactly two things:
- *   1. `showCheck=true` on the exercise editor renders a check column;
- *      tapping it kicks the rest timer and stamps set.completed via
- *      the shared form service (Partial<RoutineSet> already accepts
- *      the new `completed` field).
- *   2. Save doesn't PUT /routines — it transforms the routine-shaped
- *      draft into a WorkoutRequest and hits PUT /workouts/:clientUuid
- *      + POST /:uuid/complete.
+ * Thin VIEW over {@link ActiveWorkoutService} — that service (root-scoped)
+ * owns the draft, elapsed timer, rest countdown and lifecycle so the
+ * workout survives when the user navigates to another tab. The
+ * mini-bar in the app shell (ActiveWorkoutBar) reads the same state.
  *
- * Everything editor gives you for free — add/remove sets, superset,
- * replace exercise, reorder, notes — works mid-session too because
- * the underlying service is the same instance.
+ * Data fetch (prepareQuery) still lives here because it is per-route
+ * (routineId is a URL param). When the response lands the page seeds
+ * the service via `active.start(routineId, routine)` — if a workout
+ * for the same routine is already active, `start` no-ops (resume).
  */
 @Component({
   selector: 'page-training-session',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  providers: [RoutineEditFormService, RestTimerService],
   imports: [
     IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonContent,
     IonIcon, IonNote, IonSpinner,
@@ -66,17 +55,19 @@ import { SaveWorkoutModal, SaveWorkoutResult } from './session/save-workout.moda
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-button (click)="cancel()" aria-label="Volver">
+          <ion-button (click)="minimize()" aria-label="Minimizar">
             <ion-icon slot="icon-only" name="chevron-back-outline" />
           </ion-button>
         </ion-buttons>
         <ion-title>
-          {{ form.draft()?.title ?? 'Entrenamiento' }}
-          <span class="elapsed">{{ elapsedMmss() }} · {{ completedCount() }}/{{ totalCount() }} series</span>
+          {{ active.form.draft()?.title ?? 'Entrenamiento' }}
+          <span class="elapsed">
+            {{ active.elapsedMmss() }} · {{ completedCount() }}/{{ totalCount() }} series
+          </span>
         </ion-title>
         <ion-buttons slot="end">
           <ion-button
-            [disabled]="!form.loaded() || saving()"
+            [disabled]="!active.form.loaded() || active.saving()"
             (click)="confirmTerminar()"
             aria-label="Terminar entrenamiento">
             <ion-icon slot="start" name="checkmark-done-outline" />
@@ -87,11 +78,11 @@ import { SaveWorkoutModal, SaveWorkoutResult } from './session/save-workout.moda
     </ion-header>
 
     <ion-content>
-      @if (query.isPending()) {
+      @if (query.isPending() && !active.isActive()) {
         <ion-spinner />
-      } @else if (query.isError()) {
+      } @else if (query.isError() && !active.isActive()) {
         <ion-note color="danger">No pudimos cargar la rutina.</ion-note>
-      } @else if (form.draft(); as d) {
+      } @else if (active.form.draft(); as d) {
         @for (ex of d.exercises; track $index) {
           <app-training-exercise-editor
             [exercise]="ex"
@@ -116,40 +107,25 @@ export class SessionPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly api = inject(TrainingApi);
-  private readonly queryClient = injectQueryClient();
   private readonly alerts = inject(AlertController);
   private readonly toasts = inject(ToastController);
   private readonly modal = inject(ModalController);
-  private readonly destroyRef = inject(DestroyRef);
-  private readonly restTimer = inject(RestTimerService);
-  protected readonly form = inject(RoutineEditFormService);
-
-  protected readonly saving = signal(false);
-  /** True after a successful terminate — short-circuits the discard
-   *  guard so the follow-up navigation does not re-prompt. */
-  private savedOrDiscarded = false;
-
-  /** Idempotency key for the workout on the backend. Minted once, sent
-   *  in every upsert so retries / offline resend land on the same row. */
-  private readonly clientUuid = uuidV4();
-  private readonly startedAt = new Date();
-
-  protected readonly elapsedSeconds = signal(0);
+  protected readonly active = inject(ActiveWorkoutService);
 
   protected readonly routineId = computed(() => {
     const raw = this.route.snapshot.paramMap.get('routineId');
     return raw ? Number(raw) : NaN;
   });
 
-  /** ONE call at session start: routine detail + PRs + ANTERIOR ghost
-   *  values. Backing GET /workouts/prepare. Backed by the shared
-   *  routineDetail queryKey so returning to /training/routines/:id
-   *  after the workout uses the just-fetched routine payload from
-   *  inside `data.routine` — no separate refetch needed. */
+  /** Single call at session start: routine detail + PRs + ANTERIOR
+   *  ghost values. Only fetches when the active service does not
+   *  already have this routine loaded — reopening the tracker from
+   *  the mini-bar reuses the cached draft. */
   protected readonly query = injectQuery(() => ({
     queryKey: ['training', 'workout-prepare', this.routineId()],
     queryFn: () => firstValueFrom(this.api.prepareWorkout(this.routineId())),
-    enabled: Number.isFinite(this.routineId()),
+    enabled: Number.isFinite(this.routineId())
+      && this.active.routineId() !== this.routineId(),
   }));
 
   /** PRs bucketed by exerciseId for O(1) lookup from the exercise
@@ -183,137 +159,23 @@ export class SessionPage {
     return this.previousByExercise().get(exerciseId) ?? [];
   }
 
-  /** Session-level totals for the header counter. */
   protected readonly completedCount = computed(() => {
     let n = 0;
-    for (const ex of this.form.draft()?.exercises ?? []) {
+    for (const ex of this.active.form.draft()?.exercises ?? []) {
       for (const s of ex.sets) if (s.completed) n++;
     }
     return n;
   });
   protected readonly totalCount = computed(() => {
     let n = 0;
-    for (const ex of this.form.draft()?.exercises ?? []) n += ex.sets.length;
+    for (const ex of this.active.form.draft()?.exercises ?? []) n += ex.sets.length;
     return n;
   });
 
-  constructor() {
-    addIcons({
-      'add-outline': addOutline,
-      'checkmark-done-outline': checkmarkDoneOutline,
-      'chevron-back-outline': chevronBackOutline,
-    });
-
-    // Seed the shared form service from the routine detail once it lands.
-    effect(() => {
-      const data = this.query.data();
-      if (data && !this.form.loaded()) this.form.loadFrom(data.routine);
-    });
-
-    // Session cronómetro — 1s tick, cleaned up on destroy.
-    const startMs = this.startedAt.getTime();
-    const tick = setInterval(() => {
-      this.elapsedSeconds.set(Math.floor((Date.now() - startMs) / 1000));
-    }, 1000);
-    this.destroyRef.onDestroy(() => clearInterval(tick));
-  }
-
-  /** Toggle the check column on a set. On check-on: auto-fill actual*
-   *  from target so a user who just wants to log "did the planned set"
-   *  can tap once and move on; user can still edit actuals afterwards.
-   *  All fields are workout-only keys — form.updateSet knows not to
-   *  flip dirty, so the "actualizar rutina?" prompt at Terminar stays
-   *  reserved for structural changes. */
-  protected onCheckSet(exerciseIndex: number, setIndex: number): void {
-    const set = this.form.draft()?.exercises[exerciseIndex]?.sets[setIndex];
-    if (!set) return;
-    const wasCompleted = !!set.completed;
-    if (wasCompleted) {
-      this.form.updateSet(exerciseIndex, setIndex, { completed: false });
-      return;
-    }
-    const targetReps = set.targetRepsMax ?? set.targetRepsMin ?? null;
-    this.form.updateSet(exerciseIndex, setIndex, {
-      completed: true,
-      actualReps: set.actualReps ?? targetReps,
-      actualWeightKg: set.actualWeightKg ?? set.targetWeightKg,
-      actualDurationSeconds: set.actualDurationSeconds ?? set.targetDurationSeconds,
-    });
-    const exercise = this.form.draft()?.exercises[exerciseIndex];
-    const rest = set.restSecondsAfter ?? exercise?.restSeconds ?? 0;
-    if (rest > 0) this.restTimer.start(rest);
-  }
-
-  /** Same picker + form.addExercise path the routine editor uses.
-   *  Since we share RoutineEditFormService, the newly added exercise
-   *  lands in the session draft and is trackable immediately. Marks
-   *  dirty → Terminar will offer "actualizar rutina?". */
-  protected async openPicker(): Promise<void> {
-    const modal = await this.modal.create({ component: ExercisePickerComponent });
-    await modal.present();
-    const { data } = await modal.onDidDismiss();
-    if (data) this.form.addExercise(data.id, data.name, data.demoMediaUrl, data.capabilities);
-  }
-
-  protected elapsedMmss(): string {
-    const s = this.elapsedSeconds();
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    const r = s % 60;
-    const mm = m.toString().padStart(2, '0');
-    const rr = r.toString().padStart(2, '0');
-    return h > 0 ? `${h}:${mm}:${rr}` : `${mm}:${rr}`;
-  }
-
-  private confirming = false;
-
-  async confirmDiscardIfDirty(): Promise<boolean> {
-    // No prompt after Terminar / manual discard already resolved the
-    // session — those paths flip `savedOrDiscarded` and the follow-up
-    // Router.navigate re-fires this guard.
-    if (this.savedOrDiscarded) return true;
-    if (this.completedCount() === 0 && !this.form.dirty()) return true;
-    if (this.confirming) return false;
-    this.confirming = true;
-    try {
-      const alert = await this.alerts.create({
-        header: '¿Descartar entrenamiento?',
-        message: 'Vas a perder lo que registraste hasta ahora.',
-        buttons: [
-          { text: 'Descartar', role: 'destructive' },
-          { text: 'Seguir entrenando', role: 'cancel' },
-        ],
-      });
-      await alert.present();
-      const { role } = await alert.onDidDismiss();
-      if (role !== 'destructive') return false;
-      // Fire-and-forget; if the workout was never upserted server-side
-      // there is nothing to discard yet — swallow the 404.
-      try { await firstValueFrom(this.api.discardWorkout(this.clientUuid)); }
-      catch { /* ignore */ }
-      this.form.markPristine();
-      this.savedOrDiscarded = true;
-      return true;
-    } finally {
-      this.confirming = false;
-    }
-  }
-
-  protected async cancel(): Promise<void> {
-    const ok = await this.confirmDiscardIfDirty();
-    if (ok) this.router.navigate(['/training']);
-  }
-
-  /**
-   * Client-side total volume for the save screen's KPI card — sum of
-   * (weight × reps) across completed sets. Kept in sync with the draft
-   * so the modal reads it as a signal input. The backend recomputes it
-   * server-side at /complete anyway (source of truth), this is just for
-   * the pre-save preview.
-   */
+  /** Client-side total volume for the save screen's KPI card. */
   protected readonly totalVolumeKg = computed(() => {
     let sum = 0;
-    for (const ex of this.form.draft()?.exercises ?? []) {
+    for (const ex of this.active.form.draft()?.exercises ?? []) {
       for (const s of ex.sets) {
         if (!s.completed) continue;
         const kg = Number(s.actualWeightKg ?? s.targetWeightKg ?? 0);
@@ -324,80 +186,147 @@ export class SessionPage {
     return sum;
   });
 
-  /** Opens the "Guardar entreno" screen — collects title / notes /
-   *  visibility / duration override / routine-update choice, then
-   *  fires finalize() with the picked metadata. Replaces the 3-option
-   *  alert with a proper form. */
+  constructor() {
+    addIcons({
+      'add-outline': addOutline,
+      'checkmark-done-outline': checkmarkDoneOutline,
+      'chevron-back-outline': chevronBackOutline,
+    });
+
+    // Seed the ActiveWorkoutService from the prepare payload:
+    //   - No active workout → start fresh.
+    //   - Active for THIS routine → resume (no-op).
+    //   - Active for a DIFFERENT routine → surface a confirm to the
+    //     user before clobbering it; on decline, bounce back to the
+    //     currently-active session.
+    effect(() => {
+      const data = this.query.data();
+      if (!data) return;
+      const id = this.routineId();
+      if (!Number.isFinite(id)) return;
+      const activeId = this.active.routineId();
+      if (activeId === id) return;
+      if (activeId !== null) {
+        void this.confirmSwitchRoutine(data.routine, id, activeId);
+        return;
+      }
+      this.active.start(id, data.routine);
+    });
+  }
+
+  /** Toggle the check column on a set. On check-on: auto-fill actual*
+   *  from target so a user who just wants to log "did the planned set"
+   *  can tap once and move on. Kicks the rest timer via the root
+   *  RestTimerService (owned by ActiveWorkoutService). */
+  protected onCheckSet(exerciseIndex: number, setIndex: number): void {
+    const set = this.active.form.draft()?.exercises[exerciseIndex]?.sets[setIndex];
+    if (!set) return;
+    const wasCompleted = !!set.completed;
+    if (wasCompleted) {
+      this.active.form.updateSet(exerciseIndex, setIndex, { completed: false });
+      return;
+    }
+    const targetReps = set.targetRepsMax ?? set.targetRepsMin ?? null;
+    this.active.form.updateSet(exerciseIndex, setIndex, {
+      completed: true,
+      actualReps: set.actualReps ?? targetReps,
+      actualWeightKg: set.actualWeightKg ?? set.targetWeightKg,
+      actualDurationSeconds: set.actualDurationSeconds ?? set.targetDurationSeconds,
+    });
+    const exercise = this.active.form.draft()?.exercises[exerciseIndex];
+    const rest = set.restSecondsAfter ?? exercise?.restSeconds ?? 0;
+    if (rest > 0) this.active.restTimer.start(rest);
+  }
+
+  protected async openPicker(): Promise<void> {
+    const modal = await this.modal.create({ component: ExercisePickerComponent });
+    await modal.present();
+    const { data } = await modal.onDidDismiss();
+    if (data) this.active.form.addExercise(
+      data.id, data.name, data.demoMediaUrl, data.capabilities);
+  }
+
+  /** Chevron-back: shrink the tracker into the mini-bar and land on
+   *  the routines tab. The workout keeps ticking; the mini-bar shows
+   *  the elapsed time. */
+  protected minimize(): void {
+    void this.router.navigate(['/training']);
+  }
+
+  /** Terminar: opens the "Guardar entreno" modal. On save →
+   *  active.finalize(); on discard → active.discard(). Errors surface
+   *  as a toast without leaving the tracker. */
   protected async confirmTerminar(): Promise<void> {
-    const draft = this.form.draft();
+    const draft = this.active.form.draft();
     if (!draft) return;
 
     const modal = await this.modal.create({
       component: SaveWorkoutModal,
       componentProps: {
         initialTitle: draft.title ?? '',
-        elapsedSeconds: this.elapsedSeconds(),
+        elapsedSeconds: this.active.elapsedSeconds(),
         totalVolumeKg: this.totalVolumeKg(),
         completedSetsCount: this.completedCount(),
         totalSetsCount: this.totalCount(),
-        isDirty: this.form.dirty() && draft.id > 0,
+        isDirty: this.active.form.dirty() && draft.id > 0,
       },
     });
     await modal.present();
     const result = await modal.onDidDismiss<SaveWorkoutResult | null>();
     if (result.role === 'save' && result.data) {
-      await this.finalize(result.data.updateRoutine, result.data.metadata);
+      try {
+        await this.active.finalize(result.data.metadata, result.data.updateRoutine);
+      } catch (err) {
+        const message = err instanceof HttpError
+          ? err.userMessage
+          : (err as Error).message;
+        const toast = await this.toasts.create({
+          message, duration: 4000, color: 'danger', position: 'bottom',
+          buttons: [{ text: 'OK', role: 'cancel' }],
+        });
+        await toast.present();
+      }
     } else if (result.role === 'discard') {
       await this.discardFromModal();
     }
   }
 
-  /** Executes discard from the save screen — same flow as the header
-   *  Cancel + confirm alert, but the modal already showed the alert so
-   *  we skip re-prompting via savedOrDiscarded. */
   private async discardFromModal(): Promise<void> {
-    try { await firstValueFrom(this.api.discardWorkout(this.clientUuid)); }
-    catch { /* ignore — workout may never have been upserted */ }
-    this.form.markPristine();
-    this.savedOrDiscarded = true;
+    await this.active.discard();
     void this.router.navigate(['/training']);
   }
 
-  /** Always PUT /workouts + POST /complete. If `updateRoutine` was
-   *  picked, also PUT /routines with the (edited) draft so the template
-   *  reflects what the user actually wants going forward. */
-  private async finalize(updateRoutine: boolean, metadata: WorkoutSaveMetadata = {}): Promise<void> {
-    const draft = this.form.draft();
-    if (!draft) return;
-    this.saving.set(true);
-    try {
-      const body = routineDraftToUpsertRequest(draft, this.startedAt.toISOString(), metadata);
-      await firstValueFrom(this.api.upsertWorkout(this.clientUuid, body));
-      await firstValueFrom(this.api.completeWorkout(this.clientUuid));
-      if (updateRoutine && draft.id > 0) {
-        await firstValueFrom(
-          this.api.updateRoutine(draft.id, toUpdateRequest(draft)));
-      }
-      await this.queryClient.invalidateQueries({ queryKey: trainingKeys.all });
-      this.form.markPristine();
-      this.savedOrDiscarded = true;
-      // Route to the celebration summary. `fresh=1` picks the
-      // congratulatory banner + close-to-home behavior; without the
-      // param the same page serves as a plain history detail view.
-      void this.router.navigate(['/training/workouts', this.clientUuid, 'summary'],
-        { queryParams: { fresh: 1 } });
-    } catch (err) {
-      const message = err instanceof HttpError
-        ? err.userMessage
-        : 'No pudimos guardar el entrenamiento.';
-      const toast = await this.toasts.create({
-        message, duration: 4000, color: 'danger', position: 'bottom',
-        buttons: [{ text: 'OK', role: 'cancel' }],
-      });
-      await toast.present();
-    } finally {
-      this.saving.set(false);
+  /** Prompts when the user hits a session route for routineId B while
+   *  a workout for routineId A is already active. Accept → discard A
+   *  and start B; decline → bounce back to A's tracker (the mini-bar
+   *  would also fire an expand into A). */
+  private async confirmSwitchRoutine(
+    routine: import('@core/training/routine.model').RoutineDetail,
+    newRoutineId: number,
+    activeRoutineId: number,
+  ): Promise<void> {
+    const alert = await this.alerts.create({
+      header: 'Ya tenés un entreno activo',
+      message: 'Si empezás este, se descarta el que estás haciendo.',
+      buttons: [
+        { text: 'Seguir con el actual', role: 'cancel' },
+        { text: 'Descartar y empezar', role: 'destructive' },
+      ],
+    });
+    await alert.present();
+    const { role } = await alert.onDidDismiss();
+    if (role === 'destructive') {
+      await this.active.discard();
+      this.active.start(newRoutineId, routine);
+    } else {
+      void this.router.navigate(['/training/session', activeRoutineId]);
     }
   }
-}
 
+  /** No-op deactivate guard — the workout survives navigation now,
+   *  the mini-bar keeps it visible. Kept for the CanDeactivate hook
+   *  in training.routes to still resolve to `true`. */
+  confirmDiscardIfDirty(): boolean {
+    return true;
+  }
+}

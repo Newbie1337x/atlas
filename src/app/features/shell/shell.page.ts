@@ -4,6 +4,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map, startWith } from 'rxjs';
 import { IonNote, IonRouterOutlet } from '@ionic/angular';
 import { NetworkService } from '@core/network/network.service';
+import { ActiveWorkoutBarComponent } from '../training/session/active-workout-bar.component';
 
 /** URL patterns that hide the top notif / chat strip. Any route
  *  ending in an editor (/edit) is considered immersive. */
@@ -13,6 +14,12 @@ const HIDE_CHROME_RE = /\/edit(\/|$)/;
  *  routine editor (create + edit), active workout tracker. Keeps
  *  the bar visible on the top-level tab index pages only. */
 const HIDE_TABS_RE = /\/(session|routines\/[^/]+)(\/|$)/;
+
+/** URLs on which the active-workout mini-bar duplicates the page's
+ *  own chrome — the tracker already shows the elapsed time in its
+ *  toolbar, and the celebratory summary is post-workout so a live
+ *  "workout in progress" indicator would confuse the reader. */
+const HIDE_ACTIVE_BAR_RE = /\/(session|workouts\/[^/]+\/summary)(\/|$)/;
 
 /** Exact URLs of the top-level tab pages. Back gesture on any of
  *  these should be trapped (see tab-guard trick below) so the user
@@ -39,7 +46,7 @@ const TOP_LEVEL_TAB_RE = /^\/(home|training|profile)\/?(\?|$)/;
   selector: 'page-shell',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, RouterLinkActive, IonNote, IonRouterOutlet],
+  imports: [RouterLink, RouterLinkActive, IonNote, IonRouterOutlet, ActiveWorkoutBarComponent],
   styles: [`
     :host {
       display: flex;
@@ -103,6 +110,10 @@ const TOP_LEVEL_TAB_RE = /^\/(home|training|profile)\/?(\?|$)/;
       <ion-router-outlet></ion-router-outlet>
     </div>
 
+    @if (showActiveBar()) {
+      <app-active-workout-bar />
+    }
+
     @if (showPrimaryNav()) {
       <nav aria-label="Navegación principal">
         <ul>
@@ -142,6 +153,19 @@ export class ShellPage {
       filter((e): e is NavigationEnd => e instanceof NavigationEnd),
       map(e => !HIDE_TABS_RE.test(e.urlAfterRedirects)),
       startWith(!HIDE_TABS_RE.test(this.router.url)),
+    ),
+    { initialValue: true },
+  );
+
+  /** Hide the mini "workout in progress" pill on routes that already
+   *  show it as chrome (session tracker itself, celebration summary).
+   *  The pill also hides itself when no workout is active — this only
+   *  gates the URL-shape check. */
+  protected readonly showActiveBar = toSignal(
+    this.router.events.pipe(
+      filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+      map(e => !HIDE_ACTIVE_BAR_RE.test(e.urlAfterRedirects)),
+      startWith(!HIDE_ACTIVE_BAR_RE.test(this.router.url)),
     ),
     { initialValue: true },
   );
