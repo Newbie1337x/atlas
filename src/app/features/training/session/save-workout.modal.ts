@@ -1,6 +1,6 @@
 import {
-  ChangeDetectionStrategy, Component, ViewContainerRef,
-  computed, inject, input, signal,
+  ChangeDetectionStrategy, Component, Input, OnInit, ViewContainerRef,
+  computed, inject, signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
@@ -119,7 +119,7 @@ import { SelectSheetService } from '@shared/ui/select-sheet.service';
         <ion-icon slot="end" name="chevron-forward-outline" aria-hidden="true" />
       </ion-item>
 
-      @if (isDirty()) {
+      @if (isDirty) {
         <ion-item button="true" detail="false" class="row" (click)="pickRoutineAction()">
           <ion-icon slot="start" name="clipboard-outline" aria-hidden="true" />
           <ion-label>Ajustes de Rutina</ion-label>
@@ -140,19 +140,19 @@ import { SelectSheetService } from '@shared/ui/select-sheet.service';
     </ion-content>
   `,
 })
-export class SaveWorkoutModal {
-  /** Routine title we seed the input from — user can rewrite. */
-  readonly initialTitle = input<string>('');
-  /** Elapsed seconds so far — user can override with an alert prompt. */
-  readonly elapsedSeconds = input.required<number>();
-  /** Total volume in kg (completed sets only). */
-  readonly totalVolumeKg = input<number>(0);
-  /** Completed / total sets tuple for the KPI row. */
-  readonly completedSetsCount = input<number>(0);
-  readonly totalSetsCount = input<number>(0);
-  /** True when the draft has structural changes vs. the loaded routine
-   *  — controls whether the "Ajustes de Rutina" row shows up. */
-  readonly isDirty = input<boolean>(false);
+export class SaveWorkoutModal implements OnInit {
+  // Plain @Input fields (not signal input()) because Ionic
+  // ModalController.componentProps assigns via Object.assign onto the
+  // instance — that assignment does NOT set signal inputs (they are
+  // internal getters bound by the component metadata). Once the modal
+  // opens, none of these values change, so the classic @Input is a
+  // clean fit.
+  @Input() initialTitle = '';
+  @Input() elapsedSeconds = 0;
+  @Input() totalVolumeKg = 0;
+  @Input() completedSetsCount = 0;
+  @Input() totalSetsCount = 0;
+  @Input() isDirty = false;
 
   private readonly alerts = inject(AlertController);
   private readonly sheets = inject(SelectSheetService);
@@ -184,26 +184,27 @@ export class SaveWorkoutModal {
       'layers-outline': layersOutline,
       'chevron-forward-outline': chevronForwardOutline,
     });
-    // Seed the title once the modal receives the routine name. Signal
-    // effect on input() runs whenever initialTitle changes.
-    queueMicrotask(() => {
-      if (!this.title()) this.title.set(this.initialTitle());
-    });
+  }
+
+  ngOnInit(): void {
+    // @Input values are already assigned by ModalController's
+    // Object.assign before ngOnInit fires — safe to seed here.
+    if (!this.title()) this.title.set(this.initialTitle);
   }
 
   protected readonly effectiveDurationSeconds = computed<number>(() =>
-    this.durationOverride() ?? this.elapsedSeconds());
+    this.durationOverride() ?? this.elapsedSeconds);
 
   protected readonly durationLabel = computed(() =>
     this.formatDuration(this.effectiveDurationSeconds()));
 
   protected readonly volumeLabel = computed(() => {
-    const kg = this.totalVolumeKg();
+    const kg = this.totalVolumeKg;
     return kg >= 1000 ? `${(kg / 1000).toFixed(1)}t` : `${Math.round(kg)}kg`;
   });
 
   protected readonly completedSets = computed(() =>
-    `${this.completedSetsCount()}/${this.totalSetsCount()}`);
+    `${this.completedSetsCount}/${this.totalSetsCount}`);
 
   protected readonly visibilityLabel = computed(() => {
     switch (this.visibility()) {
@@ -278,9 +279,9 @@ export class SaveWorkoutModal {
         title: trimmedTitle || null,
         notes: trimmedNotes || null,
         visibility: this.visibility(),
-        durationSeconds: this.durationOverride() ?? this.elapsedSeconds(),
+        durationSeconds: this.durationOverride() ?? this.elapsedSeconds,
       },
-      updateRoutine: this.isDirty() && this.routineAction() === 'update',
+      updateRoutine: this.isDirty && this.routineAction() === 'update',
     };
     await this.modal.dismiss(payload, 'save');
   }
