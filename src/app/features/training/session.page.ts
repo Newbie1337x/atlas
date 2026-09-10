@@ -206,21 +206,29 @@ export class SessionPage {
     return n;
   });
 
-  /** Client-side total volume for the KPI row + save screen preview.
-   *  Delegates to the service so the mini-bar (future) and this page
-   *  read the same number. */
+  /** Client-side total volume. Walks the draft directly (not through
+   *  the service) so the reactive graph anchors on the draft signal
+   *  read HERE — routing through a plain service method broke change
+   *  detection for the KPI row on Ionic under OnPush. */
   protected readonly totalVolumeKg = computed(() => {
-    // Read a draft signal so the computed retriggers when a set moves.
-    void this.active.form.draft();
-    return this.active.totalVolumeKg();
+    let sum = 0;
+    for (const ex of this.active.form.draft()?.exercises ?? []) {
+      for (const s of ex.sets) {
+        if (!s.completed) continue;
+        const kg = Number(s.actualWeightKg ?? s.targetWeightKg ?? 0);
+        const reps = s.actualReps ?? s.targetRepsMax ?? s.targetRepsMin ?? 0;
+        if (kg > 0 && reps > 0) sum += kg * reps;
+      }
+    }
+    return sum;
   });
 
   /** Compact volume label for the KPI cell — "2,372 kg" / "1.2t". */
-  protected volumeLabel(): string {
+  protected readonly volumeLabel = computed(() => {
     const kg = this.totalVolumeKg();
     if (kg >= 1000) return `${(kg / 1000).toFixed(1)}t`;
     return `${Math.round(kg)} kg`;
-  }
+  });
 
   constructor() {
     addIcons({
