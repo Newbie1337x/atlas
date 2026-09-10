@@ -54,6 +54,7 @@ import { ActiveWorkoutService } from './active-workout.service';
       background: var(--ion-color-success, #2dd36f);
       flex-shrink: 0;
     }
+    .dot.rest { background: var(--ion-color-primary, #3880ff); }
     .label {
       display: flex; flex-direction: column;
       overflow: hidden;
@@ -84,9 +85,13 @@ import { ActiveWorkoutService } from './active-workout.service';
 
         <button type="button" class="expand" (click)="expand()">
           <span class="info">
-            <span class="dot" aria-hidden="true"></span>
+            <span class="dot" [class.rest]="resting()" aria-hidden="true"></span>
             <span class="label">
-              <span class="title">Entrenamiento {{ active.elapsedMmss() }}</span>
+              @if (resting()) {
+                <span class="title">Descanso {{ restLabel() }}</span>
+              } @else {
+                <span class="title">Entrenamiento {{ active.elapsedMmss() }}</span>
+              }
               @if (exerciseLabel(); as ex) {
                 <span class="exercise">{{ ex }}</span>
               }
@@ -110,11 +115,24 @@ export class ActiveWorkoutBarComponent {
    *  under OnPush; also gates the whole component to only render when
    *  a workout is active. */
   protected readonly visible = computed(() => {
-    // Access elapsedSeconds so the computed re-runs each tick, keeping
-    // the mm:ss label live under OnPush.
+    // Access elapsedSeconds + restTimer.remaining so the computed
+    // re-runs each tick, keeping the mm:ss label live under OnPush.
     void this.active.elapsedSeconds();
+    void this.active.restTimer.remaining();
     return this.active.isActive();
   });
+
+  /** True while a rest countdown is running — flips the pill from
+   *  "Entrenamiento" (green dot + total elapsed) to "Descanso" (blue
+   *  dot + remaining countdown). */
+  protected readonly resting = computed(() => this.active.restTimer.active());
+
+  protected restLabel(): string {
+    const s = this.active.restTimer.remaining();
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return `${m.toString().padStart(2, '0')}:${r.toString().padStart(2, '0')}`;
+  }
 
   protected exerciseLabel(): string {
     return this.active.currentExerciseLabel();
