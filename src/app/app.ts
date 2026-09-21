@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { IonApp, IonRouterOutlet } from '@ionic/angular';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { environment } from '@env';
 
 /** Below this width we're a phone or a tablet in portrait — render
@@ -7,7 +8,12 @@ import { environment } from '@env';
  *  phone-frame mockup instead of stretching mobile-only UI full-bleed.
  *  768 is the conventional tablet/desktop breakpoint — deliberately NOT
  *  a wide "fullscreen monitor" threshold, since a recruiter's browser
- *  window is often not maximized. */
+ *  window is often not maximized.
+ *
+ *  Also doubles as the recursion guard for the iframe below: the iframe
+ *  is given a ~375px-wide box, well under 768, so when THIS component
+ *  re-bootstraps inside it, computeShowFrame() is false there and it
+ *  just renders the real app — no explicit "am I embedded" flag needed. */
 const DESKTOP_BREAKPOINT = 768;
 
 /** Natural phone-frame size — see .phone-frame in the styles below. */
@@ -31,8 +37,19 @@ const FRAME_CHROME = 120;
  * Phone-frame mockup: Atlas is deliberately mobile-only (see README "What
  * Atlas is") — on a real device or the actual shipped app that's fine, but
  * the public demo build gets opened cold in a recruiter's desktop browser,
- * where the same UI stretched full-bleed just looks broken. demoMode-gated
+ * where the same UI stretched full-bleed just looked broken. demoMode-gated
  * so this never touches the real app.
+ *
+ * Renders the real app inside a same-origin <iframe> rather than just a
+ * sized CSS box — `vh`/`dvh` units ALWAYS resolve against the true browser
+ * viewport, never a constrained ancestor, no matter how that ancestor is
+ * sized (there's no CSS escape hatch for this — container query units
+ * would work but nothing downstream uses them). Several pages (shell.page
+ * among them) size themselves with `height: 100dvh`, so a plain CSS box
+ * clipped the header and cut the bottom tab bar off entirely. An iframe
+ * is a genuinely separate browsing context with its own real viewport, so
+ * the SAME bundle re-bootstrapped inside it gets `100dvh` = the iframe's
+ * own height and lays out correctly.
  */
 @Component({
   selector: 'app-root',
@@ -60,7 +77,10 @@ const FRAME_CHROME = 120;
       width: 393px;
       height: 852px;
       border-radius: 48px;
-      padding: 14px;
+      /* Extra top padding — a real bezel zone for the notch, so it never
+         overlaps the app's own header (the earlier bug: the notch was
+         painted OVER real header text, not beside it). */
+      padding: 38px 14px 14px 14px;
       background: linear-gradient(155deg, #2a2c30, #0d0e10);
       box-shadow:
         0 40px 90px -25px rgba(0, 0, 0, 0.7),
@@ -71,23 +91,24 @@ const FRAME_CHROME = 120;
          smaller size, instead of reflowing content inside a squished box. */
       zoom: var(--phone-frame-zoom, 1);
     }
-    .phone-frame ion-app {
+    .phone-frame-iframe {
       width: 100%;
       height: 100%;
-      border-radius: 34px;
-      overflow: hidden;
-      position: relative;
+      border: 0;
+      display: block;
+      border-radius: 30px;
+      background: #0a0c0f;
     }
     .phone-frame::before {
       content: '';
       position: absolute;
-      top: 26px;
+      top: 12px;
       left: 50%;
       transform: translateX(-50%);
-      width: 110px;
-      height: 26px;
+      width: 100px;
+      height: 18px;
       background: #0d0e10;
-      border-radius: 16px;
+      border-radius: 12px;
       z-index: 20;
       pointer-events: none;
     }
@@ -101,9 +122,7 @@ const FRAME_CHROME = 120;
     @if (showPhoneFrame()) {
       <div class="phone-frame-backdrop">
         <div class="phone-frame" [style.--phone-frame-zoom]="frameZoom()">
-          <ion-app>
-            <ion-router-outlet [animated]="false"></ion-router-outlet>
-          </ion-app>
+          <iframe class="phone-frame-iframe" [src]="selfUrl" title="Atlas"></iframe>
         </div>
         <p class="phone-frame-caption">Atlas es una app mobile — esto es una vista previa de escritorio.</p>
       </div>
@@ -116,9 +135,13 @@ const FRAME_CHROME = 120;
 })
 export class App {
   private readonly destroyRef = inject(DestroyRef);
+  private readonly sanitizer = inject(DomSanitizer);
 
   protected readonly showPhoneFrame = signal(this.computeShowFrame());
   protected readonly frameZoom = signal(this.computeZoom());
+  protected readonly selfUrl: SafeResourceUrl = this.sanitizer.bypassSecurityTrustResourceUrl(
+    typeof window !== 'undefined' ? window.location.href : '',
+  );
 
   constructor() {
     if (!environment.demoMode || typeof window === 'undefined') return;
