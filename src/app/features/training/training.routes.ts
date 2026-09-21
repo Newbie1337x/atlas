@@ -17,6 +17,13 @@ export const trainingRoutes: Routes = [
   { path: '',                  loadComponent: () => import('./training.page').then((m) => m.TrainingPage) },
   { path: 'explore',           loadComponent: () => import('./explore.page').then((m) => m.ExplorePage) },
   {
+    // No routineId — ad-hoc workout, no template. Same component;
+    // SessionPage branches on whether the param is present.
+    path: 'session',
+    loadComponent: () => import('./session.page').then((m) => m.SessionPage),
+    canDeactivate: [sessionDeactivateGuard],
+  },
+  {
     path: 'session/:routineId',
     loadComponent: () => import('./session.page').then((m) => m.SessionPage),
     canDeactivate: [sessionDeactivateGuard],

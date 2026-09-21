@@ -5,9 +5,18 @@ import { addOutline, playSkipForwardOutline, removeOutline } from 'ionicons/icon
 import { RestTimerService } from './rest-timer.service';
 
 /**
- * Sticky bottom banner that appears whenever the rest timer is
- * counting down. Shows MM:SS, ±15s buttons and a Skip. Renders as
- * `[hidden]` when inactive so the layout doesn't jump.
+ * Bottom banner that appears whenever the rest timer is counting down.
+ * Shows MM:SS, ±15s buttons and a Skip. Renders as `[hidden]` when
+ * inactive so the layout doesn't jump.
+ *
+ * Placed in ion-content's `slot="fixed"` (see session.page.ts) with
+ * `position: absolute` — NOT `position: sticky` as a normal scrolling
+ * child. Sticky only pins once its in-flow position scrolls to the
+ * container edge; with a short exercise list (or zero, in an ad-hoc
+ * workout) that in-flow position sits right under "Agregar ejercicio"
+ * instead of the actual bottom of the screen. The fixed slot exists
+ * precisely for chrome that must stay glued to the bottom regardless
+ * of how much content is above it.
  */
 @Component({
   selector: 'app-training-session-rest-timer',
@@ -16,12 +25,15 @@ import { RestTimerService } from './rest-timer.service';
   imports: [IonButton, IonIcon],
   styles: [`
     :host {
-      position: sticky;
+      position: absolute;
       bottom: 0;
+      left: 0;
+      right: 0;
       display: block;
       background: var(--ion-color-primary, #3880ff);
       color: #fff;
       padding: 10px 12px;
+      padding-bottom: calc(10px + env(safe-area-inset-bottom));
       border-top: 1px solid rgba(255, 255, 255, 0.2);
       z-index: 10;
     }

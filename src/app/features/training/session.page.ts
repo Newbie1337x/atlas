@@ -33,14 +33,14 @@ const DURATION_OPTIONS: readonly number[] = (() => {
   return out;
 })();
 
-/** "0" → "Apagado", "45" → "45s", "120" → "2min", "3720" → "1h 2min". */
+/** "0" → "0 min", "45" → "45 s", "120" → "2 min", "3720" → "1 h 2 min". */
 function formatDurationSeconds(s: number): string {
-  if (s === 0) return 'Apagado';
-  if (s < 60) return `${s}s`;
+  if (s === 0) return '0 min';
+  if (s < 60) return `${s} s`;
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
-  if (h > 0) return m === 0 ? `${h}h` : `${h}h ${m}min`;
-  return `${m}min`;
+  if (h > 0) return m === 0 ? `${h} h` : `${h} h ${m} min`;
+  return `${m} min`;
 }
 
 /**
@@ -162,7 +162,7 @@ function formatDurationSeconds(s: number): string {
         </ion-button>
       }
 
-      <app-training-session-rest-timer />
+      <app-training-session-rest-timer slot="fixed" />
 
       <!-- Invisible wheel picker mounted at the page level. Opened
            imperatively via #durationPicker.openSheet() from the
@@ -305,6 +305,20 @@ export class SessionPage {
       }
       this.active.start(id, data.routine);
     });
+
+    // Ad-hoc "empty workout" — /training/session with no routineId.
+    // No prepare query to wait on (there's no template), so this seeds
+    // immediately instead of waiting on `query.data()`.
+    effect(() => {
+      if (Number.isFinite(this.routineId())) return;
+      const activeId = this.active.routineId();
+      if (this.active.isActive() && activeId === null) return;
+      if (this.active.isActive() && activeId !== null) {
+        void this.confirmSwitchRoutine(null, null, activeId);
+        return;
+      }
+      this.active.start(null, null);
+    });
   }
 
   /** Toggle the check column on a set. On check-on: auto-fill actual*
@@ -403,13 +417,15 @@ export class SessionPage {
     void this.router.navigate(['/training']);
   }
 
-  /** Prompts when the user hits a session route for routineId B while
-   *  a workout for routineId A is already active. Accept → discard A
-   *  and start B; decline → bounce back to A's tracker (the mini-bar
-   *  would also fire an expand into A). */
+  /** Prompts when the user hits a session route for routineId B (or the
+   *  routineId-less ad-hoc route) while a workout for routineId A is
+   *  already active. Accept → discard A and start B; decline → bounce
+   *  back to A's tracker (the mini-bar would also fire an expand into A).
+   *  `newRoutineId`/`routine` are both null for the ad-hoc "entrenamiento
+   *  vacío" case. */
   private async confirmSwitchRoutine(
-    routine: import('@core/training/routine.model').RoutineDetail,
-    newRoutineId: number,
+    routine: import('@core/training/routine.model').RoutineDetail | null,
+    newRoutineId: number | null,
     activeRoutineId: number,
   ): Promise<void> {
     const alert = await this.alerts.create({

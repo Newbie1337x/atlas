@@ -77,8 +77,13 @@ export class ActiveWorkoutService {
    * routineId, no-op (resume). If a different one is active, throws —
    * caller should ask the user to discard first via
    * `confirmStartOverActive()`.
+   *
+   * `routineId: null` + `routine: null` seeds an AD-HOC workout — no
+   * template, id=0 draft (same "unpersisted" shape the routine editor
+   * uses for "new routine" mode via `form.startEmpty()`), exercises
+   * added live through the picker.
    */
-  start(routineId: number, routine: RoutineDetail): void {
+  start(routineId: number | null, routine: RoutineDetail | null): void {
     if (this.isActive() && this._routineId() === routineId) return;
     if (this.isActive() && this._routineId() !== routineId) {
       throw new Error('Another workout is already active — discard first');
@@ -86,7 +91,15 @@ export class ActiveWorkoutService {
     this._clientUuid.set(uuidV4());
     this._startedAt.set(new Date());
     this._routineId.set(routineId);
-    this.form.loadFrom(routine);
+    if (routine) {
+      this.form.loadFrom(routine);
+    } else {
+      // startEmpty() seeds title: '' (right for the routine editor's
+      // "type your own title" flow) — the session toolbar needs a
+      // non-blank fallback, so set one explicitly here.
+      this.form.startEmpty();
+      this.form.updateTitle('Entrenamiento libre');
+    }
     this.savedOrDiscarded = false;
     this._elapsedSeconds.set(0);
     this.startTick();
