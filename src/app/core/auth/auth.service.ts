@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable, from, of, switchMap, tap, throwError } from 'rxjs';
 import { StorageService } from '@core/storage/storage.service';
+import { environment } from '@env';
 import { AuthApi } from './auth.api';
 import { SessionStore } from './session.store';
 import { AUTH_STORAGE_KEYS, CurrentUser } from './auth.tokens';
@@ -73,7 +74,15 @@ export class AuthService {
     );
   }
 
+  /**
+   * No-op in the public showcase build (environment.demoMode) — there's no
+   * real session to end, and clearing it would just strand the visitor on
+   * a login screen with no backend behind it. `publicOnlyGuard` bounces
+   * any navigation to /auth/login straight back to '/' while still
+   * authenticated, so the net effect is "Cerrar sesión" does nothing.
+   */
   async logout(): Promise<void> {
+    if (environment.demoMode) return;
     await this.clearSession();
   }
 

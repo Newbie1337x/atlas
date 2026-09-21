@@ -6,6 +6,11 @@
 export const environment = {
   production: false,
 
+  /** True only in environment.demo.ts — swaps in the in-memory mock API
+   *  layer and an auto-hydrated session so the app runs standalone with
+   *  no Proteus backend at all. See src/app/core/demo/. */
+  demoMode: false,
+
   /** Proteus API base URL. */
   apiUrl: 'http://localhost:8080',
 

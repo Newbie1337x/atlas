@@ -1,0 +1,53 @@
+name: Deploy showcase to GitHub Pages
+
+# Public, backend-free build of Atlas (environment.demo.ts) — auto-logged-in
+# with in-memory mock data, no Proteus instance involved. See
+# src/app/core/demo/ and README.md's "Live demo" section.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build:demo
+
+      # GitHub Pages serves 404.html for any unmatched path (with a 404
+      # status, but the file's content still loads) — the standard trick
+      # for client-side-routed SPAs on static hosting. Angular Router then
+      # boots and renders the real route once index.html-equivalent loads.
+      - run: cp dist/gym-front/browser/index.html dist/gym-front/browser/404.html
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/gym-front/browser
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

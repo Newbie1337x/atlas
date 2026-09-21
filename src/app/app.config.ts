@@ -20,13 +20,27 @@ import { authInterceptor } from '@core/auth/auth.interceptor';
 import { errorTransformInterceptor } from '@core/errors/error-transform.interceptor';
 import { GlobalErrorHandler } from '@core/errors/global-error.handler';
 import { AuthService } from '@core/auth/auth.service';
+import { SessionStore } from '@core/auth/session.store';
 import { enableQueryPersistence } from '@core/offline/query-persist';
+import { UsersApi } from '@core/users/users.api';
+import { TrainingApi } from '@core/training/training.api';
+import { DemoUsersApi } from '@core/demo/demo-users.api';
+import { DemoTrainingApi } from '@core/demo/demo-training.api';
+import { hydrateDemoSession } from '@core/demo/demo-session';
 
 /**
  * App bootstrap. Restores the persisted session BEFORE the router boots so
  * guards see the authenticated state on cold app start.
+ *
+ * In the public showcase build (environment.demoMode) there's no backend
+ * to restore a session FROM — hydrateDemoSession seeds a fake-but-valid
+ * session directly instead, so the app lands straight on Home.
  */
 function restoreAuthOnStartup() {
+  if (environment.demoMode) {
+    const session = inject(SessionStore);
+    return () => hydrateDemoSession(session);
+  }
   const auth = inject(AuthService);
   return () => auth.restore();
 }
@@ -86,5 +100,15 @@ export const appConfig: ApplicationConfig = {
     { provide: ErrorHandler,      useClass: GlobalErrorHandler },
 
     { provide: APP_INITIALIZER, useFactory: restoreAuthOnStartup, multi: true },
+
+    // Public showcase build only — swaps the real HTTP-backed APIs for an
+    // in-memory mock so the whole app runs standalone with no Proteus
+    // instance at all. See src/app/core/demo/.
+    ...(environment.demoMode
+      ? [
+          { provide: UsersApi, useClass: DemoUsersApi },
+          { provide: TrainingApi, useClass: DemoTrainingApi },
+        ]
+      : []),
   ],
 };
