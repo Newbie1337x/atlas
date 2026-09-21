@@ -135,6 +135,39 @@ export class TrainingActionsService {
     await this.invalidate();
   }
 
+  /**
+   * Applied after a press-and-hold drag-drop (see FolderSectionComponent's
+   * cdkDropList) moves a routine within a folder, or across two folders,
+   * on the Training tab itself — the fast inline alternative to
+   * {@link openReorderRoutines}'s modal.
+   *
+   * Cross-folder needs 2-3 calls: the server's reorder batch endpoint
+   * validates every id already belongs to the target folder (see
+   * RoutineService.reorderRoutinesInFolder), so the moved routine's
+   * folderId must be PATCHed first, then both folders' displayOrder
+   * resequenced so there's no gap left in the source.
+   */
+  async applyRoutineDrop(params: {
+    sourceFolderId: number | null;
+    targetFolderId: number | null;
+    sourceIdsAfter: readonly number[];
+    targetIdsAfter: readonly number[];
+    movedRoutineId: number;
+  }): Promise<void> {
+    const { sourceFolderId, targetFolderId, sourceIdsAfter, targetIdsAfter, movedRoutineId } = params;
+    if (sourceFolderId === targetFolderId) {
+      if (targetIdsAfter.length < 2) return;
+      await firstValueFrom(this.api.reorderRoutinesInFolder(targetFolderId, [...targetIdsAfter]));
+    } else {
+      await firstValueFrom(this.api.patchRoutineMetadata(movedRoutineId, { folderId: targetFolderId }));
+      await firstValueFrom(this.api.reorderRoutinesInFolder(targetFolderId, [...targetIdsAfter]));
+      if (sourceIdsAfter.length) {
+        await firstValueFrom(this.api.reorderRoutinesInFolder(sourceFolderId, [...sourceIdsAfter]));
+      }
+    }
+    await this.invalidate();
+  }
+
   async confirmDeleteFolder(folder: RoutineFolder): Promise<void> {
     const ok = await this.confirm({
       header: 'Borrar carpeta',

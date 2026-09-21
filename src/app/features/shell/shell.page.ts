@@ -2,7 +2,12 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map, startWith } from 'rxjs';
-import { IonNote, IonRouterOutlet } from '@ionic/angular';
+import { IonNote, IonRouterOutlet, IonIcon } from '@ionic/angular';
+import { addIcons } from 'ionicons';
+import {
+  home, homeOutline, barbell, barbellOutline, person, personOutline,
+  notificationsOutline, chatbubbleOutline,
+} from 'ionicons/icons';
 import { NetworkService } from '@core/network/network.service';
 import { ActiveWorkoutBarComponent } from '../training/session/active-workout-bar.component';
 
@@ -35,8 +40,9 @@ const TOP_LEVEL_TAB_RE = /^\/(home|training|profile)\/?(\?|$)/;
  *   1. Tiny 'sin conexión' banner when navigator.onLine is false.
  *      Everything stays functional — banner is informational, no feature
  *      gets disabled by it. Writes queue offline-first.
- *   2. Secondary actions row: bell (notifications) + chat icon. NOT in
- *      the bottom nav (Instagram/Strava layout).
+ *   2. Secondary actions row: bell (notifications). NOT in the bottom
+ *      nav (Instagram/Strava layout). Chat icon commented out until
+ *      the chat feature ships — see the template.
  *   3. <ion-router-outlet> — the active feature's page.
  *   4. Primary bottom nav: home / training / profile — the 3 mental
  *      buckets a gym user thinks in (social + workouts + me).
@@ -48,14 +54,14 @@ const TOP_LEVEL_TAB_RE = /^\/(home|training|profile)\/?(\?|$)/;
   selector: 'page-shell',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, RouterLinkActive, IonNote, IonRouterOutlet, ActiveWorkoutBarComponent],
+  imports: [RouterLink, RouterLinkActive, IonNote, IonRouterOutlet, IonIcon, ActiveWorkoutBarComponent],
   styles: [`
     :host {
       display: flex;
       flex-direction: column;
       height: 100vh;
       height: 100dvh;
-      background: var(--ion-background-color, #fff);
+      background: var(--ion-background-color);
     }
     .offline-banner {
       display: block;
@@ -64,19 +70,29 @@ const TOP_LEVEL_TAB_RE = /^\/(home|training|profile)\/?(\?|$)/;
     }
     .secondary-actions {
       display: flex;
-      gap: 16px;
-      padding: 16px;
-      border-bottom: 1px solid var(--ion-color-step-150, #eee);
-      background: var(--ion-color-step-50, #f9f9f9);
+      justify-content: flex-end;
+      gap: 20px;
+      padding: 14px 20px;
+      padding-top: calc(14px + env(safe-area-inset-top));
+    }
+    .secondary-actions a {
+      display: flex;
+      color: var(--atlas-muted);
+      text-decoration: none;
+      font-size: 22px;
+    }
+    .secondary-actions a.active {
+      color: var(--atlas-accent);
     }
     .main-content {
       flex: 1;
       position: relative;
+      overflow: hidden;
     }
     nav {
-      padding: 16px;
-      border-top: 1px solid var(--ion-color-step-150, #eee);
-      background: var(--ion-color-step-50, #f9f9f9);
+      padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
+      border-top: 1px solid var(--atlas-border);
+      background: var(--ion-background-color);
     }
     nav ul {
       display: flex;
@@ -85,13 +101,24 @@ const TOP_LEVEL_TAB_RE = /^\/(home|training|profile)\/?(\?|$)/;
       margin: 0;
       padding: 0;
     }
-    a {
+    nav a {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      padding: 8px 18px;
       text-decoration: none;
-      color: var(--ion-text-color, #333);
+      color: var(--atlas-muted);
+      font-size: 11px;
+      font-weight: 500;
+      -webkit-tap-highlight-color: transparent;
     }
-    a.active {
-      font-weight: bold;
-      color: var(--ion-color-primary, #000);
+    nav a ion-icon {
+      font-size: 23px;
+    }
+    nav a.active {
+      color: var(--atlas-accent);
+      font-weight: 700;
     }
   `],
   template: `
@@ -103,8 +130,15 @@ const TOP_LEVEL_TAB_RE = /^\/(home|training|profile)\/?(\?|$)/;
 
     @if (showSecondary()) {
       <div class="secondary-actions">
-        <a routerLink="/notifications" routerLinkActive="active">🔔 Notificaciones</a>
-        <a routerLink="/chat"          routerLinkActive="active">💬 Chat</a>
+        <a routerLink="/notifications" routerLinkActive="active" aria-label="Notificaciones">
+          <ion-icon name="notifications-outline" />
+        </a>
+        <!-- Chat icon hidden until the chat feature actually ships —
+             an icon that goes nowhere real is worse than no icon.
+        <a routerLink="/chat" routerLinkActive="active" aria-label="Chat">
+          <ion-icon name="chatbubble-outline" />
+        </a>
+        -->
       </div>
     }
 
@@ -125,7 +159,10 @@ const TOP_LEVEL_TAB_RE = /^\/(home|training|profile)\/?(\?|$)/;
         <ul>
           @for (tab of primaryTabs; track tab.path) {
             <li>
-              <a [routerLink]="tab.path" routerLinkActive="active">{{ tab.label }}</a>
+              <a [routerLink]="tab.path" routerLinkActive="active">
+                <ion-icon [name]="tab.icon" />
+                {{ tab.label }}
+              </a>
             </li>
           }
         </ul>
@@ -181,13 +218,20 @@ export class ShellPage {
    * to the 3 buckets the user mentally groups by. Adding a fourth here is
    * a UX regression — think twice.
    */
-  protected readonly primaryTabs: readonly { path: string; label: string }[] = [
-    { path: '/home',     label: 'Inicio'         },
-    { path: '/training', label: 'Entrenamiento'  },
-    { path: '/profile',  label: 'Perfil'         },
+  protected readonly primaryTabs: readonly { path: string; label: string; icon: string }[] = [
+    { path: '/home',     label: 'Inicio',        icon: 'home-outline'    },
+    { path: '/training', label: 'Entrenamiento', icon: 'barbell-outline' },
+    { path: '/profile',  label: 'Perfil',        icon: 'person-outline'  },
   ];
 
   constructor() {
+    addIcons({
+      home, 'home-outline': homeOutline,
+      barbell, 'barbell-outline': barbellOutline,
+      person, 'person-outline': personOutline,
+      'notifications-outline': notificationsOutline,
+      'chatbubble-outline': chatbubbleOutline,
+    });
     this.installBackGestureTrap();
   }
 

@@ -1,9 +1,12 @@
 import {
   ChangeDetectionStrategy, Component, ViewContainerRef,
-  inject, input, signal,
+  computed, inject, input, signal,
 } from '@angular/core';
 import {
-  IonList, IonListHeader, IonLabel, IonNote, IonIcon, IonButton,
+  CdkDropList, CdkDrag, CdkDragDrop,
+} from '@angular/cdk/drag-drop';
+import {
+  IonList, IonIcon, IonButton,
 } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import {
@@ -16,6 +19,14 @@ import { RoutineSummary } from '@core/training/routine.model';
 import { TrainingActionsService } from '@core/training/training-actions.service';
 import { SelectSheetService, SelectSheetOption } from '@shared/ui/select-sheet.service';
 import { RoutineCardComponent } from './routine-card.component';
+
+/** What a folder's drop list carries — the moved item's origin/target
+ *  folder id plus the list it's leaving/entering, read straight off
+ *  the CDK drop event so `onDrop` needs no cross-component lookup. */
+interface DropListData {
+  folderId: number | null;
+  routines: readonly RoutineSummary[];
+}
 
 /**
  * One folder + the routines it holds. The "loose" bucket (folderId=null)
@@ -31,28 +42,54 @@ import { RoutineCardComponent } from './routine-card.component';
  * persistence, reverted because a PUT per toggle is wrong for cosmetic UI
  * state; the right home is Capacitor Preferences (device-local, survives
  * cold starts and reboots) when we add mobile persistence infra.
+ *
+ * Drag-and-drop: every folder-section's routine list is a `cdkDropList`,
+ * connected to every other one via the `cdkDropListGroup` the parent
+ * TrainingPage puts around the whole `@for` — so a press-and-hold drag
+ * can carry a routine from this folder into any other (or the loose
+ * bucket) and drop it at a chosen position. `cdkDragStartDelay` (touch
+ * only) is what makes it "press and hold" instead of hijacking a normal
+ * vertical scroll gesture. See `onDrop` for the resulting API calls.
  */
 @Component({
   selector: 'app-training-folder-section',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    IonList, IonListHeader, IonLabel, IonNote, IonIcon, IonButton,
+    IonList, IonIcon, IonButton,
+    CdkDropList, CdkDrag,
     RoutineCardComponent,
   ],
   styles: [`
+    /* Plain div, not ion-list-header — in iOS mode ion-list-header sets
+       align-items: flex-end and only compensates ::slotted(ion-label)/
+       ::slotted(ion-button) with a hand-tuned margin-top, so a bare
+       ::slotted(ion-icon) (this chevron) was left pinned to the top,
+       floating well above the label text. Full manual flex control here
+       sidesteps that shadow-CSS quirk entirely. */
     .folder-header {
       cursor: pointer;
       user-select: none;
       display: flex;
       align-items: center;
       gap: 8px;
+      padding: 10px 16px;
     }
     .folder-header:hover {
       opacity: 0.75;
     }
+    .chevron {
+      font-size: 20px;
+      flex-shrink: 0;
+    }
     .folder-title {
       flex: 1;
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--ion-text-color);
     }
     .count-badge {
       font-size: 0.85em;
@@ -63,20 +100,36 @@ import { RoutineCardComponent } from './routine-card.component';
       --padding-start: 8px;
       --padding-end: 8px;
     }
+    .routine-list {
+      min-height: 8px;
+    }
+    .routine-list.cdk-drop-list-dragging {
+      background: var(--atlas-surface, rgba(255, 255, 255, 0.03));
+      border-radius: var(--atlas-radius-md, 10px);
+    }
+    .cdk-drag-preview {
+      box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.5);
+      border-radius: var(--atlas-radius-md, 10px);
+      opacity: 0.95;
+    }
+    .cdk-drag-placeholder {
+      opacity: 0.25;
+    }
+    .cdk-drag-animating {
+      transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+    }
   `],
   template: `
     <ion-list>
-      <ion-list-header class="folder-header" role="button" [attr.aria-expanded]="!collapsed()">
+      <div class="folder-header" role="button" [attr.aria-expanded]="!collapsed()" (click)="toggle()">
         <ion-icon
+          class="chevron"
           [name]="collapsed() ? 'chevron-forward' : 'chevron-down'"
-          (click)="toggle()"
           aria-hidden="true" />
-        <ion-label class="folder-title" (click)="toggle()">
-          <h2>
-            {{ label() }}
-            <span class="count-badge">({{ routines().length }})</span>
-          </h2>
-        </ion-label>
+        <h2 class="folder-title">
+          {{ label() }}
+          <span class="count-badge">({{ routines().length }})</span>
+        </h2>
         @if (folder(); as f) {
           <ion-button
             fill="clear"
@@ -87,16 +140,24 @@ import { RoutineCardComponent } from './routine-card.component';
             <ion-icon slot="icon-only" name="ellipsis-vertical" />
           </ion-button>
         }
-      </ion-list-header>
+      </div>
 
       @if (!collapsed()) {
-        @if (routines().length === 0) {
-          <ion-note class="ion-padding-start">Carpeta vacía</ion-note>
-        } @else {
+        <!-- No "empty folder" placeholder text — min-height alone keeps
+             a small droppable strip even with zero routines, invisibly. -->
+        <div
+          class="routine-list"
+          cdkDropList
+          [cdkDropListData]="dropData()"
+          (cdkDropListDropped)="onDrop($event)">
           @for (r of routines(); track r.id) {
-            <app-training-routine-card [routine]="r" />
+            <app-training-routine-card
+              cdkDrag
+              [cdkDragData]="r"
+              [cdkDragStartDelay]="dragStartDelay"
+              [routine]="r" />
           }
-        }
+        </div>
       }
     </ion-list>
   `,
@@ -116,6 +177,15 @@ export class FolderSectionComponent {
 
   protected readonly collapsed = signal(false);
 
+  /** Touch needs a deliberate press-and-hold so a normal scroll gesture
+   *  doesn't get hijacked as a drag; mouse (desktop/dev) stays instant. */
+  protected readonly dragStartDelay = { touch: 300, mouse: 0 };
+
+  protected readonly dropData = computed<DropListData>(() => ({
+    folderId: this.folder()?.id ?? null,
+    routines: this.routines(),
+  }));
+
   constructor() {
     addIcons({
       'chevron-down': chevronDown,
@@ -131,6 +201,45 @@ export class FolderSectionComponent {
 
   protected toggle(): void {
     this.collapsed.update(c => !c);
+  }
+
+  /**
+   * Fires on whichever folder-section's list the routine was RELEASED
+   * into — CDK's event carries both `previousContainer` (source) and
+   * `container` (target) data, so this single handler covers same-folder
+   * reorder and cross-folder move without the two FolderSectionComponent
+   * instances needing to know about each other.
+   */
+  protected onDrop(event: CdkDragDrop<DropListData>): void {
+    const sourceFolderId = event.previousContainer.data.folderId;
+    const targetFolderId = event.container.data.folderId;
+    const movedRoutine = event.previousContainer.data.routines[event.previousIndex];
+    if (!movedRoutine) return;
+
+    if (event.previousContainer === event.container) {
+      const reordered = [...event.container.data.routines];
+      reordered.splice(event.previousIndex, 1);
+      reordered.splice(event.currentIndex, 0, movedRoutine);
+      void this.actions.applyRoutineDrop({
+        sourceFolderId, targetFolderId,
+        sourceIdsAfter: reordered.map(r => r.id),
+        targetIdsAfter: reordered.map(r => r.id),
+        movedRoutineId: movedRoutine.id,
+      });
+      return;
+    }
+
+    const sourceAfter = [...event.previousContainer.data.routines];
+    sourceAfter.splice(event.previousIndex, 1);
+    const targetAfter = [...event.container.data.routines];
+    targetAfter.splice(event.currentIndex, 0, movedRoutine);
+
+    void this.actions.applyRoutineDrop({
+      sourceFolderId, targetFolderId,
+      sourceIdsAfter: sourceAfter.map(r => r.id),
+      targetIdsAfter: targetAfter.map(r => r.id),
+      movedRoutineId: movedRoutine.id,
+    });
   }
 
   protected async openMenu(folder: RoutineFolder): Promise<void> {

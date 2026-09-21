@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.tomascabrera.gymfront',
-  appName: 'Gym',
+  appName: 'Atlas',
   webDir: 'dist/gym-front/browser',
   server: {
     androidScheme: 'https',

@@ -1,10 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Capacitor } from '@capacitor/core';
-import {
-  IonContent, IonHeader, IonTitle, IonToolbar,
-  IonButton, IonNote,
-} from '@ionic/angular';
+import { IonContent, IonIcon } from '@ionic/angular';
+import { addIcons } from 'ionicons';
+import { logoGoogle, logoFacebook } from 'ionicons/icons';
 import { AuthApi } from '@core/auth/auth.api';
 
 /**
@@ -32,35 +31,143 @@ import { AuthApi } from '@core/auth/auth.api';
   selector: 'page-login',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    RouterLink,
-    IonContent, IonHeader, IonTitle, IonToolbar,
-    IonButton, IonNote,
-  ],
-  template: `
-    <ion-header>
-      <ion-toolbar>
-        <ion-title>Ingresar</ion-title>
-      </ion-toolbar>
-    </ion-header>
-
-    <ion-content class="ion-padding">
-      @for (p of providers(); track p.id) {
-        <ion-button expand="block" size="large" (click)="loginWith(p.id)">
-          {{ p.label }}
-        </ion-button>
+  imports: [RouterLink, IonContent, IonIcon],
+  styles: [`
+    :host {
+      display: block;
+      height: 100%;
+    }
+    ion-content {
+      --padding-top: env(safe-area-inset-top);
+      --padding-bottom: env(safe-area-inset-bottom);
+    }
+    .screen {
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 48px 28px 32px;
+      background:
+        radial-gradient(120% 60% at 50% -10%, rgba(255, 90, 31, 0.18), transparent 60%),
+        var(--ion-background-color);
+    }
+    .brand {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      margin-top: 8vh;
+    }
+    .logo-mark {
+      width: 76px;
+      height: 76px;
+      border-radius: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: Georgia, 'Times New Roman', serif;
+      font-weight: 700;
+      font-size: 34px;
+      color: #0a0c0f;
+      background: linear-gradient(150deg, var(--atlas-accent-tint), var(--atlas-accent) 70%);
+      animation: pulse 2.2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 12px 32px -8px rgba(255, 90, 31, 0.55), 0 0 0 0 rgba(255, 90, 31, 0.45);
       }
+      50% {
+        transform: scale(1.06);
+        box-shadow: 0 12px 32px -8px rgba(255, 90, 31, 0.55), 0 0 0 14px rgba(255, 90, 31, 0);
+      }
+    }
+    .wordmark {
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: 6px;
+      margin: 0;
+      color: var(--ion-text-color);
+    }
+    .tagline {
+      margin: 0;
+      font-size: 14px;
+      color: var(--atlas-muted);
+      letter-spacing: 0.3px;
+      text-align: center;
+    }
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-bottom: 8px;
+    }
+    .social-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      height: 54px;
+      border-radius: var(--atlas-radius-md);
+      border: none;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .social-btn.google {
+      background: #ffffff;
+      color: #1f1f1f;
+    }
+    .social-btn.facebook {
+      background: #1877f2;
+      color: #ffffff;
+    }
+    .social-btn ion-icon {
+      font-size: 20px;
+    }
+    .email-link {
+      display: block;
+      text-align: center;
+      margin-top: 18px;
+      color: var(--atlas-muted);
+      font-size: 14px;
+      text-decoration: none;
+    }
+    .email-link:active {
+      opacity: 0.7;
+    }
+  `],
+  template: `
+    <ion-content [fullscreen]="true">
+      <div class="screen">
+        <div class="brand">
+          <div class="logo-mark">A</div>
+          <h1 class="wordmark">ATLAS</h1>
+          <p class="tagline">Tu progreso. Tu ritmo.<br>Entrená sin fricción.</p>
+        </div>
 
-      <ion-note class="ion-margin-top">
-        <ion-button fill="clear" size="small" expand="block" routerLink="/auth/email">
-          Ingresar con email
-        </ion-button>
-      </ion-note>
+        <div class="actions">
+          @for (p of providers(); track p.id) {
+            <button class="social-btn" [class]="p.id" (click)="loginWith(p.id)">
+              <ion-icon [name]="p.icon" />
+              {{ p.label }}
+            </button>
+          }
+
+          <a class="email-link" routerLink="/auth/email">Ingresar con email</a>
+        </div>
+      </div>
     </ion-content>
   `,
 })
 export class LoginPage {
   private readonly api = inject(AuthApi);
+
+  constructor() {
+    addIcons({ 'logo-google': logoGoogle, 'logo-facebook': logoFacebook });
+  }
 
   /**
    * Runtime platform. Capacitor.getPlatform() returns 'ios' | 'android' | 'web'.
@@ -73,9 +180,9 @@ export class LoginPage {
    * (computed) so a future 'user hides Facebook' toggle would trigger a
    * re-render for free.
    */
-  protected readonly providers = computed<readonly { id: 'google' | 'facebook'; label: string }[]>(() => {
-    const google   = { id: 'google'   as const, label: 'Continuar con Google'   };
-    const facebook = { id: 'facebook' as const, label: 'Continuar con Facebook' };
+  protected readonly providers = computed<readonly { id: 'google' | 'facebook'; label: string; icon: string }[]>(() => {
+    const google   = { id: 'google'   as const, label: 'Continuar con Google',   icon: 'logo-google'   };
+    const facebook = { id: 'facebook' as const, label: 'Continuar con Facebook', icon: 'logo-facebook' };
     // Same list today (Apple absent) — order stays declarative so inserting
     // { id: 'apple', label: 'Continuar con Apple' } later is a one-line edit
     // at the platform-appropriate position.

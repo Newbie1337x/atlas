@@ -2,10 +2,15 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { injectQuery } from '@tanstack/angular-query-experimental';
+import { CdkDropListGroup } from '@angular/cdk/drag-drop';
 import {
   IonContent, IonHeader, IonTitle, IonToolbar,
-  IonButton, IonNote, IonSpinner,
+  IonNote, IonSpinner, IonIcon,
 } from '@ionic/angular';
+import { addIcons } from 'ionicons';
+import {
+  flameOutline, compassOutline, folderOpenOutline, addCircleOutline,
+} from 'ionicons/icons';
 import { TrainingApi } from '@core/training/training.api';
 import { TrainingActionsService } from '@core/training/training-actions.service';
 import { trainingKeys } from '@core/training/training.keys';
@@ -36,9 +41,74 @@ import { FolderSectionComponent } from './routines/folder-section.component';
   imports: [
     RouterLink,
     IonContent, IonHeader, IonTitle, IonToolbar,
-    IonButton, IonNote, IonSpinner,
+    IonNote, IonSpinner, IonIcon,
+    CdkDropListGroup,
     FolderSectionComponent,
   ],
+  styles: [`
+    .cta-card {
+      margin: 4px 0 16px;
+      padding: 20px;
+      border-radius: var(--atlas-radius-lg);
+      background: linear-gradient(135deg, #ff5a1f, #ff8a3d);
+      color: #0a0c0f;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      text-decoration: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .cta-card:active {
+      opacity: 0.9;
+    }
+    .cta-text h3 {
+      margin: 0 0 2px;
+      font-size: 18px;
+      font-weight: 800;
+    }
+    .cta-text p {
+      margin: 0;
+      font-size: 13px;
+      opacity: 0.85;
+    }
+    .cta-icon {
+      font-size: 30px;
+    }
+    .quick-actions {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+    .quick-action {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 14px 6px;
+      border-radius: var(--atlas-radius-md);
+      background: var(--atlas-surface);
+      border: 1px solid var(--atlas-border);
+      color: var(--ion-text-color);
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 600;
+      text-align: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .quick-action:active {
+      background: var(--atlas-surface-raised);
+    }
+    .quick-action ion-icon {
+      font-size: 22px;
+      color: var(--atlas-accent);
+    }
+    .center-pad {
+      display: flex;
+      justify-content: center;
+      padding: 24px 0;
+    }
+  `],
   template: `
     <ion-header>
       <ion-toolbar>
@@ -47,34 +117,49 @@ import { FolderSectionComponent } from './routines/folder-section.component';
     </ion-header>
 
     <ion-content class="ion-padding">
-      <ion-button expand="block" routerLink="/training/session">
-        Empezar entrenamiento vacío
-      </ion-button>
-      <ion-button fill="outline" expand="block" routerLink="/training/explore">
-        Explorar templates
-      </ion-button>
-      <ion-button fill="outline" expand="block" (click)="actions.promptCreateFolder()">
-        Nueva carpeta
-      </ion-button>
-      <ion-button fill="outline" expand="block" (click)="actions.promptCreateRoutine()">
-        Nueva rutina
-      </ion-button>
+      <a class="cta-card" routerLink="/training/session">
+        <div class="cta-text">
+          <h3>Entrenamiento vacío</h3>
+          <p>Empezá a registrar sin una rutina</p>
+        </div>
+        <ion-icon class="cta-icon" name="flame-outline" />
+      </a>
+
+      <div class="quick-actions">
+        <a class="quick-action" routerLink="/training/explore">
+          <ion-icon name="compass-outline" />
+          Explorar
+        </a>
+        <button class="quick-action" (click)="actions.promptCreateFolder()">
+          <ion-icon name="folder-open-outline" />
+          Carpeta
+        </button>
+        <button class="quick-action" (click)="actions.promptCreateRoutine()">
+          <ion-icon name="add-circle-outline" />
+          Rutina
+        </button>
+      </div>
 
       @if (foldersQuery.isPending() || routinesQuery.isPending()) {
-        <ion-spinner />
+        <div class="center-pad"><ion-spinner /></div>
       } @else if (foldersQuery.isError() || routinesQuery.isError()) {
         <ion-note color="danger">No pudimos cargar tus rutinas.</ion-note>
       } @else {
         @if (visibleBuckets().length === 0) {
           <ion-note>Todavía no tenés rutinas. Creá una para empezar.</ion-note>
         }
-        @for (bucket of visibleBuckets(); track bucketKey(bucket)) {
-          <app-training-folder-section
-            [label]="bucket.folder?.name ?? 'Mis rutinas'"
-            [folder]="bucket.folder"
-            [allFolders]="foldersQuery.data() ?? []"
-            [routines]="bucket.routines" />
-        }
+        <!-- Groups every folder-section's cdkDropList so a press-and-hold
+             drag can carry a routine card across folder boundaries, not
+             just reorder within the one it started in. -->
+        <div cdkDropListGroup>
+          @for (bucket of visibleBuckets(); track bucketKey(bucket)) {
+            <app-training-folder-section
+              [label]="bucket.folder?.name ?? 'Mis rutinas'"
+              [folder]="bucket.folder"
+              [allFolders]="foldersQuery.data() ?? []"
+              [routines]="bucket.routines" />
+          }
+        </div>
       }
     </ion-content>
   `,
@@ -82,6 +167,15 @@ import { FolderSectionComponent } from './routines/folder-section.component';
 export class TrainingPage {
   private readonly api = inject(TrainingApi);
   protected readonly actions = inject(TrainingActionsService);
+
+  constructor() {
+    addIcons({
+      'flame-outline': flameOutline,
+      'compass-outline': compassOutline,
+      'folder-open-outline': folderOpenOutline,
+      'add-circle-outline': addCircleOutline,
+    });
+  }
 
   /** Default first page — pagination controls arrive when a real user starts
    *  hitting >20 routines (not this milestone). */

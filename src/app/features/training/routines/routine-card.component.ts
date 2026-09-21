@@ -27,8 +27,34 @@ import { SelectSheetService } from '@shared/ui/select-sheet.service';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, IonItem, IonLabel, IonNote, IonButton, IonIcon],
+  styles: [`
+    /* ion-item[routerLink] renders a real <a href> internally — on
+       Android Chrome, a long-press on a link fires the browser's native
+       "Abrir en pestaña nueva / Copiar enlace" context menu, which wins
+       the gesture before cdkDrag's press-and-hold ever gets a chance to
+       start. touch-callout + user-select (+ the (contextmenu) handler
+       below) suppress that popup specifically.
+       Deliberately NOT setting touch-action: none here — that property
+       is read by the browser's compositor at touch-start, before any JS
+       runs, so it blocks native scrolling on this element unconditionally
+       and fights cdkDragStartDelay, whose whole point is to let a quick
+       touch-and-scroll pass through as normal scrolling and only take
+       over once the finger has actually held still past the delay. That
+       combination (touch-action:none + start delay) is what made cards
+       feel "stuck" under a scrolling finger. */
+    :host {
+      display: block;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+  `],
   template: `
-    <ion-item [routerLink]="['/training/routines', routine().id]" button [detail]="false">
+    <ion-item
+      [routerLink]="['/training/routines', routine().id]"
+      button [detail]="false"
+      (contextmenu)="$event.preventDefault()">
       <ion-label>
         <h3>{{ routine().title }}</h3>
         <p>
