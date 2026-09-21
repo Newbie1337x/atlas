@@ -2,10 +2,13 @@ import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '
 import { IonApp, IonRouterOutlet } from '@ionic/angular';
 import { environment } from '@env';
 
-/** Below this width we're a phone (real device or a narrow browser window) —
- *  render edge-to-edge as normal. Above it, only in the demo build, wrap
- *  in a phone-frame mockup instead of stretching mobile-only UI full-bleed. */
-const DESKTOP_BREAKPOINT = 860;
+/** Below this width we're a phone or a tablet in portrait — render
+ *  edge-to-edge as normal. Above it, only in the demo build, wrap in a
+ *  phone-frame mockup instead of stretching mobile-only UI full-bleed.
+ *  768 is the conventional tablet/desktop breakpoint — deliberately NOT
+ *  a wide "fullscreen monitor" threshold, since a recruiter's browser
+ *  window is often not maximized. */
+const DESKTOP_BREAKPOINT = 768;
 
 /** Natural phone-frame size — see .phone-frame in the styles below. */
 const FRAME_HEIGHT = 852;
