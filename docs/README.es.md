@@ -2,7 +2,7 @@
 
 # 🏔️ Atlas
 
-**Un tracker de entrenamientos con look nativo, hecho sobre el módulo Gimnasio de [Proteus](https://github.com/Newbie1337x/Proteus-API) — rutinas, sesiones en vivo, récords personales.**
+**Un tracker de entrenamientos que se siente 100% nativo, hecho sobre el módulo de entrenamiento de [Proteus](https://github.com/Newbie1337x/Proteus-API) — rutinas, sesiones en vivo, récords personales.**
 
 [![Angular](https://img.shields.io/badge/Angular-22-DD0031?logo=angular&logoColor=white)](https://angular.dev)
 [![Ionic](https://img.shields.io/badge/Ionic-9-3880FF?logo=ionic&logoColor=white)](https://ionicframework.com)
@@ -30,7 +30,7 @@
 
 ## Qué es Atlas
 
-Atlas es un tracker de entrenamientos mobile para el módulo Gimnasio (training) de [Proteus](https://github.com/Newbie1337x/Proteus-API) — rutinas organizadas en carpetas, sesiones de entrenamiento en vivo, récords personales, medidas corporales. Login social, offline-first, empaquetada como app instalable real vía Capacitor.
+Atlas es un tracker de entrenamientos mobile, construido sobre el módulo de entrenamiento (`training`) de [Proteus](https://github.com/Newbie1337x/Proteus-API) — rutinas organizadas en carpetas, sesiones de entrenamiento en vivo, récords personales, medidas corporales. Login social, offline-first, empaquetada como app instalable real vía Capacitor.
 
 Es deliberadamente rígida: un shell fijo, un flujo fijo, sin personalización. Alguien entrenando quiere *siempre la misma pantalla*, en medio de una serie, sin tener que pensar — por eso cada pantalla existe para no estorbar mientras entrenás, no para configurarse.
 
@@ -39,7 +39,7 @@ Es deliberadamente rígida: un shell fijo, un flujo fijo, sin personalización. 
 La [demo](https://newbie1337x.github.io/atlas/) es la app real — mismos componentes, mismo drag-and-drop, mismo tracker de sesión en vivo — corriendo sola en GitHub Pages sin ninguna instancia de Proteus detrás. Dos cosas lo hacen posible:
 
 - **`UsersApi`/`TrainingApi` reemplazados por mocks en memoria** vía un simple override de provider de DI (`{ provide: TrainingApi, useClass: DemoTrainingApi }` en `app.config.ts`) cuando `environment.demoMode` está activo — cada pantalla que lee o escribe a través de esos servicios funciona sin modificarse, con datos de prueba en vez de llamadas HTTP.
-- **Auto-autenticada al cargar**, hidratando la sesión con un JWT autofirmado construido del lado del cliente (`core/demo/demo-session.ts`). El frontend nunca verifica la firma — `SessionStore` solo necesita decodificar el payload — así que esto siembra estado real de la app sin que ningún token toque un servidor.
+- **Auto-autenticada al cargar**, hidratando la sesión con un JWT autofirmado construido del lado del cliente (`core/demo/demo-session.ts`). El frontend nunca verifica la firma — `SessionStore` solo necesita decodificar el payload — así que esto inicializa un estado real de la app sin que ningún token llegue a tocar un servidor.
 
 El estado es solo en memoria y se resetea al recargar — es lo esperado para un sandbox público, no un bug.
 
@@ -50,7 +50,7 @@ Esta lista está limitada a lo que está implementado y se puede probar ahora mi
 ### Autenticación
 - Login social primero — Google y Facebook en un toque, el orden de providers se adapta según la plataforma (`login.page.ts`)
 - Email + contraseña como alternativa, escondido detrás de un link secundario para que nunca compita con el flujo de un toque
-- Registro, verificación por email, olvidé/reseteo de contraseña — el circuito completo, incluyendo el par JWT `access` + `refresh` y refresh silencioso ante un 401
+- Registro, verificación por email, olvidé/reseteo de contraseña — el flujo completo, incluyendo el par JWT `access` + `refresh` y refresh silencioso ante un 401
 - URL base de la API resuelta en runtime (`app.config.ts`): abrís la app desde `localhost` y pega contra `localhost:8080`; la abrís desde una IP de LAN o Tailscale y pega contra *ese mismo host* en `:8080` — un solo build de desarrollo sirve a una notebook y a un celular a la vez, sin configuración
 
 ### Entrenamiento
@@ -58,7 +58,7 @@ Esta lista está limitada a lo que está implementado y se puede probar ahora mi
 - **Drag-and-drop con apretar y mantener** para reordenar rutinas o moverlas entre carpetas, con una secuencia real de dos pasos contra la API (primero el PATCH de carpeta de la rutina movida, después resecuenciar el `displayOrder` de ambas carpetas en una transacción cada una)
 - Editor de rutinas completo: ejercicios, sets, descanso, notas, **supersets**, **modo de reps** (valor único o rango)
 - Las capacidades de cada ejercicio manejan la UI, no al revés — un ejercicio de peso corporal nunca muestra el campo de peso, uno de duración nunca muestra reps; el backend aplica las mismas reglas al guardar, así que ningún cliente puede mandar una combinación inválida
-- Tracker de entrenamiento en vivo: tildar sets, autocompleta los valores reales con el objetivo al primer toque, **cronómetro de descanso** con selector tipo rueda para ajustar ±15s rápido, **detección de PR en vivo** contra tu historial, **valores fantasma "ANTERIOR"** de tu última sesión de ese ejercicio
+- Tracker de entrenamiento en vivo: tildar sets, autocompleta los valores reales con el objetivo al primer toque, **cronómetro de descanso** con selector tipo rueda para ajustes rápidos de ±15s, **detección de PR en vivo** contra tu historial, **valores fantasma "ANTERIOR"** de tu última sesión de ese ejercicio
 - **"Entrenamiento vacío"** ad-hoc — arrancás a trackear sin ninguna plantilla y vas agregando ejercicios sobre la marcha
 - Fila de KPIs (tiempo transcurrido, volumen, series completadas) en vivo durante la sesión
 - El entrenamiento sobrevive si navegás a otra pantalla — una mini-barra persistente en el shell te deja revisar rutinas o tu perfil a mitad de serie y volver directo
